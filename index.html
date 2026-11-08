@@ -192,7 +192,7 @@
   }
   function wetterLaden() {
     var o = z.einstellungen.ort; if (!o) return;
-    senden("GET", "/functions/v1/dienste?art=wetter&lat=" + o.lat + "&lon=" + o.lon, null, function (w) { w.ort = o.name; wetter = w; wetterZeit = Date.now(); if (!modalOffen) zeichne(); }, true);
+    senden("GET", "/functions/v1/dienste?art=wetter&lat=" + o.lat + "&lon=" + o.lon, null, function (w) { if (w.fehler) { if (!wetter || wetter.fehler) wetter = w; setTimeout(wetterLaden, 120000); } else { w.ort = o.name; wetter = w; } wetterZeit = Date.now(); if (!modalOffen) zeichne(); }, true);
   }
 
   /* ---------- Netz ---------- */
@@ -341,7 +341,7 @@
 
   /* ---------- Gebetszeiten ---------- */
   var gebetDaten = null, GNAMEN = ["Fadjr", "Dohr", "Assr", "Maghrib", "Ishaa"];
-  function gebetLaden() { var p = ortPunkt(); senden("GET", "/functions/v1/dienste?art=gebet&lat=" + p.lat + "&lon=" + p.lon, null, function (g) { gebetDaten = g; if (!modalOffen) zeichne(); }, true); }
+  function gebetLaden() { var p = ortPunkt(); senden("GET", "/functions/v1/dienste?art=gebet&lat=" + p.lat + "&lon=" + p.lon, null, function (g) { if (g.fehler) { if (!gebetDaten || gebetDaten.fehler) gebetDaten = g; setTimeout(gebetLaden, 120000); } else gebetDaten = g; if (!modalOffen) zeichne(); }, true); }
   function gebetKarte(d) {
     var k = el("div", "karte gebetK"); var h = el("h2", "", "Gebetszeiten"); k.appendChild(h);
     if (!gebetDaten) { k.appendChild(el("div", "klein", "Wird geladen …")); return k; }
