@@ -108,7 +108,10 @@
   .farbe.an { border-color: var(--text); }
   .sy { font-size: 28px; min-width: 52px; }
   .nach { margin-top: 14px; text-align: center; }
-  @media (max-width: 800px) { #uhr { font-size: 30px; } .spalte { min-width: 85vw; } }
+  .kachel.schlaf { flex-wrap: wrap; }
+  .kachel.schlaf .pille { flex: 1 1 100%; margin-top: 2px; }
+  .kachel .txt { overflow-wrap: anywhere; }
+  @media (max-width: 800px) { #uhr { font-size: 30px; } .spalten { flex-direction: column; overflow-x: visible; } .spalte { min-width: 0; width: 100%; } header { flex-wrap: wrap; } #titel { flex-basis: 100%; } .gebet b { font-size: 19px; } }
 </style>
 </head>
 <body>
@@ -410,7 +413,7 @@
       var teile = []; for (var i = 0; i < e.length; i++) teile.push(e[i].bis ? e[i].z + "–" + e[i].bis + " (" + dauer(e[i].z, e[i].bis) + ")" : "schläft seit " + e[i].z);
       sub.textContent = (t.zeit ? t.zeit + " Uhr · " : "") + (teile.length ? teile.join(" · ") : "noch nicht geschlafen");
       if (e.length) { var u = el("button", "x mini", "↩"); u.onclick = function (ev) { ev.stopPropagation(); aktion({ op: "schlaf_zurueck", id: t.id, datum: d, zeit: zeitWert() }); }; k.appendChild(u); }
-      var o = offen(e); var sk = el("button", "pille", o ? "Aufgewacht ☀️" : "Eingeschlafen"); sk.style.background = o ? "#FF9F0A" : p.farbe;
+      k.className += " schlaf"; var o = offen(e); var sk = el("button", "pille", o ? "Aufgewacht ☀️" : "Eingeschlafen"); sk.style.background = o ? "#FF9F0A" : p.farbe;
       if (o) { var zz = el("span", "zzz", "💤"); tx.appendChild(zz); }
       k.onclick = function (ev) { if (o) konfetti(ev.clientX, ev.clientY); aktion({ op: "schlaf", id: t.id, datum: d, zeit: zeitWert() }); };
       k.appendChild(sk);
