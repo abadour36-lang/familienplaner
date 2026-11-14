@@ -290,6 +290,7 @@
       }
       if ("moschee" in a) { var mo = String(a.moschee || "").trim().toLowerCase(); if (mo && !/^[a-z0-9][a-z0-9-]{0,60}$/.test(mo)) throw new Error("Moschee-Kürzel ungültig"); n.einstellungen.moschee = mo; }
       if ("adhan" in a) n.einstellungen.adhan = !!a.adhan;
+      if ("eingerichtet" in a) n.einstellungen.eingerichtet = !!a.eingerichtet;
       if ("gebet" in a) {
         var gb = a.gebet || {}, gfw = +gb.fw, giw = +gb.iw, gim = Math.round(+gb.iwMin || 0), gaf = +gb.af, gau = [];
         if (!(gfw >= 5 && gfw <= 24 && giw >= 5 && giw <= 24 && (gaf === 1 || gaf === 2) && gim >= 0 && gim <= 180)) throw new Error("Gebetsrechnung ungültig");
@@ -311,7 +312,7 @@
     });
   }
   function aktion(a, danach) { aktionRoh(a, function () { gebetPruefen(); if (danach) danach(); if (modalOffen && neuBauen) neuBauen(); else zeichne(); }); }
-  function lesen() { senden("POST", "/rest/v1/rpc/planer_lesen", { k: KEY }, function (neu) { z = neu; if (!wetter) wetterLaden(); gebetPruefen(); if (!modalOffen) zeichne(); }, true); }
+  function lesen() { senden("POST", "/rest/v1/rpc/planer_lesen", { k: KEY }, function (neu) { z = neu; if (!wetter) wetterLaden(); gebetPruefen(); if (!modalOffen) zeichne(); if (!z.einstellungen.eingerichtet && !z.einstellungen.ort && !modalOffen) willkommen(); }, true); }
   function holen() {
     if (gesperrt) return;
     if (!KEY) { sperre(); return; }
@@ -642,6 +643,36 @@
     });
   }
 
+  /* ---------- Einrichtung beim ersten Start ---------- */
+  var willkommenOffen = false, mosText = "", gelesen = false;
+  function willkommen() {
+    if (willkommenOffen) return; willkommenOffen = true;
+    fenster(function (b, zu) {
+      b.appendChild(el("h1", "", "Willkommen 👋"));
+      b.appendChild(el("div", "klein", "Einmal einrichten, dann läuft der Planer: Ort für das Wetter, Moschee für die Gebetszeiten und der Gebetsruf."));
+      var ort = z.einstellungen.ort, t1 = el("h3", "", "1. Ort für das Wetter"); t1.style.marginTop = "16px"; b.appendChild(t1);
+      b.appendChild(el("div", "klein", ort ? "Gewählt: " + ort.name : "Noch kein Ort gewählt."));
+      ortSuchfeld(b);
+      var t2 = el("h3", "", "2. Deine Moschee (kann leer bleiben)"); t2.style.marginTop = "16px"; b.appendChild(t2);
+      b.appendChild(el("div", "klein", "Auf mawaqit.net deine Moschee suchen und öffnen. Das Kürzel steht am Ende der Adresse, zum Beispiel …/de/m/rahman-kerpen → rahman-kerpen. Leer gelassen, werden die Zeiten aus dem Sonnenstand berechnet."));
+      var mi = inp("text", mosText, "Moschee-Kürzel"); mi.oninput = function () { mosText = mi.value; }; b.appendChild(mi);
+      var t3 = el("h3", "", "3. Gebetsruf zu den Gebetszeiten"); t3.style.marginTop = "16px"; b.appendChild(t3);
+      var sa = el("div", "segment");
+      [[false, "Aus"], [true, "An"]].forEach(function (o) { var k = el("button", !!z.einstellungen.adhan === o[0] ? "an" : "", o[1]); k.onclick = function () { audio(); aktion({ op: "einstellung", adhan: o[0] }); }; sa.appendChild(k); });
+      b.appendChild(sa);
+      var dh = el("div", "klein", "Hinweis zum Test: Deine Einträge (Namen, Aufgaben, Termine) liegen auf einem Server in Frankfurt (Supabase). Anouar Badour, der den Test betreibt, kann sie technisch einsehen und nutzt sie nur für den Test. Zum Löschen sag ihm einfach Bescheid."); dh.style.marginTop = "16px"; b.appendChild(dh);
+      var cb = inp("checkbox", ""); cb.checked = gelesen; cb.onchange = function () { gelesen = cb.checked; };
+      var cz = el("label", "klein", " Ich habe den Hinweis gelesen."); cz.insertBefore(cb, cz.firstChild); cz.style.display = "block"; cz.style.margin = "10px 0"; b.appendChild(cz);
+      var ok = el("button", "blau", "Fertig, los geht’s");
+      ok.onclick = function () {
+        if (!z.einstellungen.ort) { alert("Bitte zuerst einen Ort wählen."); return; }
+        if (!gelesen) { alert("Bitte den Hinweis bestätigen."); return; }
+        aktion({ op: "einstellung", moschee: mosText, eingerichtet: true }, function () { willkommenOffen = false; zu(); });
+      };
+      b.appendChild(ok);
+    });
+  }
+
   var einstPerson = "";
   function einstellungen(abschnitt, personId) {
     var cur = abschnitt || "aufgaben"; if (personId) einstPerson = personId; if (!person(einstPerson) && z.personen.length) einstPerson = z.personen[0].id;
@@ -687,10 +718,7 @@
     var ok = el("button", "blau", "+ Hinzufügen"); ok.onclick = function () { if (nn.value.trim()) aktion({ op: "person_neu", name: nn.value, farbe: FARBEN[z.personen.length % FARBEN.length] }); };
     var r = el("div", "zeile"); r.appendChild(nn); r.appendChild(ok); b.appendChild(r);
   }
-  function bauAnzeige(b) {
-    var seg = el("div", "segment"); [2, 3].forEach(function (n) { var k = el("button", z.einstellungen.raster === n ? "an" : "", n + " Stunden"); k.onclick = function () { aktion({ op: "einstellung", raster: n }); }; seg.appendChild(k); });
-    b.appendChild(zeile("Zeitraster", seg));
-    var ort = z.einstellungen.ort; b.appendChild(el("div", "klein", "Ort für das Wetter: " + (ort ? ort.name : "nicht gewählt")));
+  function ortSuchfeld(b) {
     var s = inp("text", "", "Stadt oder Ort suchen"); var go = el("button", "blau", "Suchen"); var erg = el("div"); erg.style.marginTop = "8px";
     function suche() {
       if (!s.value.trim()) return; leeren(erg); erg.appendChild(el("div", "klein", "Suche …"));
@@ -702,6 +730,12 @@
     }
     go.onclick = suche; s.onkeydown = function (e) { if (e.keyCode === 13) suche(); };
     var r = el("div", "zeile"); r.appendChild(s); r.appendChild(go); b.appendChild(r); b.appendChild(erg);
+  }
+  function bauAnzeige(b) {
+    var seg = el("div", "segment"); [2, 3].forEach(function (n) { var k = el("button", z.einstellungen.raster === n ? "an" : "", n + " Stunden"); k.onclick = function () { aktion({ op: "einstellung", raster: n }); }; seg.appendChild(k); });
+    b.appendChild(zeile("Zeitraster", seg));
+    var ort = z.einstellungen.ort; b.appendChild(el("div", "klein", "Ort für das Wetter: " + (ort ? ort.name : "nicht gewählt")));
+    ortSuchfeld(b);
     if (ort) { var w = el("button", "", "Ort entfernen"); w.onclick = function () { aktion({ op: "einstellung", ort: null }, function () { wetter = null; }); }; b.appendChild(w); }
     var mos = z.einstellungen.moschee || "";
     var kopf = el("div", "klein", "Moschee bei Mawaqit: " + (mos ? mos : "keine (Zeiten werden berechnet)")); kopf.style.marginTop = "16px"; b.appendChild(kopf);
