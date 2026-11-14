@@ -287,6 +287,8 @@
         if (a.ort === null) n.einstellungen.ort = null;
         else { var la = +a.ort.lat, lo = +a.ort.lon; if (!(la >= -90 && la <= 90 && lo >= -180 && lo <= 180)) throw new Error("Ort ungültig"); n.einstellungen.ort = { name: txt(a.ort.name, 80, true), lat: Math.round(la * 10000) / 10000, lon: Math.round(lo * 10000) / 10000 }; }
       }
+      if ("moschee" in a) { var mo = String(a.moschee || "").trim().toLowerCase(); if (mo && !/^[a-z0-9][a-z0-9-]{0,60}$/.test(mo)) throw new Error("Moschee-Kürzel ungültig"); n.einstellungen.moschee = mo; }
+      if ("adhan" in a) n.einstellungen.adhan = !!a.adhan;
     } else throw new Error("Unbekannte Aktion");
     var tage = []; for (var dd in n.verlauf) tage.push(dd); tage.sort();
     if (tage.length > 200) for (i = 0; i < tage.length - 150; i++) delete n.verlauf[tage[i]];
@@ -342,9 +344,36 @@
     melodie(gross ? FANFARE : PINGS[Math.floor(Math.random() * PINGS.length)]);
   }
 
+  /* ---------- Gebetsruf (Aufnahme adhan.ogg, Wikimedia Commons, CC0) ---------- */
+  var adhanEl = null, adhanKnopf = null;
+  function stoppZeigen(an) {
+    if (!adhanKnopf) {
+      adhanKnopf = el("button", "blau", "⏹ Gebetsruf stoppen"); adhanKnopf.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:60;display:none;box-shadow:0 4px 16px rgba(0,0,0,.35)";
+      adhanKnopf.onclick = adhanStopp; document.body.appendChild(adhanKnopf);
+    }
+    adhanKnopf.style.display = an ? "block" : "none";
+  }
+  function adhanSpielen() {
+    try {
+      if (!adhanEl) { adhanEl = new Audio("adhan.ogg"); adhanEl.preload = "auto"; adhanEl.onended = function () { stoppZeigen(false); }; adhanEl.onerror = function () { stoppZeigen(false); }; }
+      adhanEl.currentTime = 0; stoppZeigen(true);
+      var pr = adhanEl.play(); if (pr && pr.catch) pr.catch(function () { stoppZeigen(false); });
+    } catch (e) { stoppZeigen(false); }
+  }
+  function adhanStopp() { try { if (adhanEl) { adhanEl.pause(); adhanEl.currentTime = 0; } } catch (e) {} stoppZeigen(false); }
+  function adhanPruefen() {
+    if (!tonAn || !z.einstellungen.adhan || !gebetDaten || gebetDaten.fehler || !gebetDaten.heute) return;
+    var n = new Date(), heute = ymd(n); if (gebetDaten.tag !== heute) return;
+    var min = n.getHours() * 60 + n.getMinutes(), zuletzt = ""; try { zuletzt = localStorage.getItem("adhanZuletzt") || ""; } catch (e) {}
+    for (var i = 0; i < gebetDaten.heute.length; i++) {
+      var t = gebetDaten.heute[i].split(":"), m = +t[0] * 60 + +t[1], kz = heute + "-" + i;
+      if (min >= m && min <= m + 1 && zuletzt !== kz) { try { localStorage.setItem("adhanZuletzt", kz); } catch (e) {} adhanSpielen(); break; }
+    }
+  }
+
   /* ---------- Gebetszeiten ---------- */
   var gebetDaten = null, GNAMEN = ["Fadjr", "Dohr", "Assr", "Maghrib", "Ishaa"];
-  function gebetLaden() { var p = ortPunkt(); senden("GET", "/functions/v1/dienste?art=gebet&lat=" + p.lat + "&lon=" + p.lon, null, function (g) { if (g.fehler) { if (!gebetDaten || gebetDaten.fehler) gebetDaten = g; setTimeout(gebetLaden, 120000); } else gebetDaten = g; if (!modalOffen) zeichne(); }, true); }
+  function gebetLaden() { var p = ortPunkt(); senden("GET", "/functions/v1/dienste?art=gebet&lat=" + p.lat + "&lon=" + p.lon + "&m=" + encodeURIComponent(z.einstellungen.moschee || ""), null, function (g) { if (g.fehler) { if (!gebetDaten || gebetDaten.fehler) gebetDaten = g; setTimeout(gebetLaden, 120000); } else gebetDaten = g; if (!modalOffen) zeichne(); }, true); }
   function gebetKarte(d) {
     var k = el("div", "karte gebetK"); var h = el("h2", "", "Gebetszeiten"); k.appendChild(h);
     if (!gebetDaten) { k.appendChild(el("div", "klein", "Wird geladen …")); return k; }
@@ -600,12 +629,24 @@
     go.onclick = suche; s.onkeydown = function (e) { if (e.keyCode === 13) suche(); };
     var r = el("div", "zeile"); r.appendChild(s); r.appendChild(go); b.appendChild(r); b.appendChild(erg);
     if (ort) { var w = el("button", "", "Ort entfernen"); w.onclick = function () { aktion({ op: "einstellung", ort: null }, function () { wetter = null; }); }; b.appendChild(w); }
+    var mos = z.einstellungen.moschee || "";
+    var kopf = el("div", "klein", "Moschee bei Mawaqit: " + (mos ? mos : "keine (Zeiten werden berechnet)")); kopf.style.marginTop = "16px"; b.appendChild(kopf);
+    b.appendChild(el("div", "klein", "Kürzel aus der Adresse, zum Beispiel mawaqit.net/de/m/rahman-kerpen → rahman-kerpen"));
+    var mi = inp("text", mos, "Moschee-Kürzel"); var mk = el("button", "blau", "Speichern");
+    mk.onclick = function () { aktion({ op: "einstellung", moschee: mi.value }, function () { gebetDaten = null; gebetLaden(); }); };
+    var mz = el("div", "zeile"); mz.appendChild(mi); mz.appendChild(mk); b.appendChild(mz);
+    var sa = el("div", "segment");
+    [[false, "Aus"], [true, "An"]].forEach(function (o) { var k = el("button", !!z.einstellungen.adhan === o[0] ? "an" : "", o[1]); k.onclick = function () { audio(); aktion({ op: "einstellung", adhan: o[0] }); }; sa.appendChild(k); });
+    var gz = zeile("Gebetsruf zu den Gebetszeiten", sa); gz.style.marginTop = "16px"; b.appendChild(gz);
+    b.appendChild(el("div", "klein", "Der Gebetsruf erklingt nur bei eingeschaltetem Ton (🔔) und wenn die Seite geöffnet ist."));
+    var te = el("button", "", "Gebetsruf anhören"); te.onclick = function () { audio(); adhanSpielen(); }; b.appendChild(te);
   }
 
   /* ---------- Start ---------- */
   function uhr() {
     var n = new Date(); $("uhr").textContent = hhmm(n); var h = ymd(n);
     if (h !== letzterTag) { var war = tag === letzterTag; letzterTag = h; if (war) tag = h; gebetLaden(); if (!modalOffen) zeichne(); }
+    adhanPruefen();
   }
   function tonZeichen() { $("ton").textContent = tonAn ? "🔔" : "🔕"; }
   $("ton").onclick = function () { tonAn = !tonAn; try { localStorage.setItem("ton", tonAn ? "an" : "aus"); } catch (e) {} tonZeichen(); if (tonAn) { audio(); melodie(PINGS[0]); } };
