@@ -353,7 +353,7 @@
   }
 
   /* ---------- Gebetsruf (Aufnahme adhan.ogg, Wikimedia Commons, CC0) ---------- */
-  var adhanEl = null, adhanKnopf = null;
+  var adhanEl = null, adhanKnopf = null, adhanUrl = "", tonDB = null;
   function stoppZeigen(an) {
     if (!adhanKnopf) {
       adhanKnopf = el("button", "blau", "⏹ Gebetsruf stoppen"); adhanKnopf.style.cssText = "position:fixed;right:16px;bottom:16px;z-index:60;display:none;box-shadow:0 4px 16px rgba(0,0,0,.35)";
@@ -361,21 +361,42 @@
     }
     adhanKnopf.style.display = an ? "block" : "none";
   }
-  function adhanSpielen() {
-    try {
-      if (!adhanEl) { adhanEl = new Audio("adhan.ogg"); adhanEl.preload = "auto"; adhanEl.onended = function () { stoppZeigen(false); }; adhanEl.onerror = function () { stoppZeigen(false); }; }
-      adhanEl.currentTime = 0; stoppZeigen(true);
-      var pr = adhanEl.play(); if (pr && pr.catch) pr.catch(function () { stoppZeigen(false); });
-    } catch (e) { stoppZeigen(false); }
+  // eigene Gebetsruf-Dateien liegen nur auf diesem Gerät (IndexedDB), nie auf dem Server
+  function tonOeffnen(fertig) {
+    if (tonDB) { fertig(tonDB); return; }
+    try { var r = indexedDB.open("familienplaner", 1); r.onupgradeneeded = function () { r.result.createObjectStore("ton"); }; r.onsuccess = function () { tonDB = r.result; fertig(tonDB); }; r.onerror = function () { fertig(null); }; } catch (e) { fertig(null); }
   }
-  function adhanStopp() { try { if (adhanEl) { adhanEl.pause(); adhanEl.currentTime = 0; } } catch (e) {} stoppZeigen(false); }
+  function tonLesen(schl, fertig) {
+    tonOeffnen(function (db) { if (!db) { fertig(null); return; } try { var q = db.transaction("ton", "readonly").objectStore("ton").get(schl); q.onsuccess = function () { fertig(q.result || null); }; q.onerror = function () { fertig(null); }; } catch (e) { fertig(null); } });
+  }
+  function tonSchreiben(schl, blob, fertig) {
+    tonOeffnen(function (db) { if (!db) { fertig(false); return; } try { var t = db.transaction("ton", "readwrite"); if (blob) t.objectStore("ton").put(blob, schl); else t.objectStore("ton").delete(schl); t.oncomplete = function () { fertig(true); }; t.onerror = function () { fertig(false); }; } catch (e) { fertig(false); } });
+  }
+  function eigenName(schl) { try { return localStorage.getItem("adhanEigen_" + schl) || ""; } catch (e) { return ""; } }
+  // index 0 = Fadjr, 1 bis 4 = Dohr, Assr, Maghrib, Ishaa
+  function adhanSpielen(index) {
+    adhanStopp();
+    var schl = index === 0 && eigenName("fadjr") ? "fadjr" : (eigenName("standard") ? "standard" : "");
+    function los(quelle) {
+      try {
+        adhanEl = new Audio(quelle); adhanEl.onended = function () { stoppZeigen(false); }; adhanEl.onerror = function () { stoppZeigen(false); };
+        stoppZeigen(true); var pr = adhanEl.play(); if (pr && pr.catch) pr.catch(function () { stoppZeigen(false); });
+      } catch (e) { stoppZeigen(false); }
+    }
+    if (!schl) { los("adhan.ogg"); return; }
+    tonLesen(schl, function (blob) { if (blob) { adhanUrl = URL.createObjectURL(blob); los(adhanUrl); } else los("adhan.ogg"); });
+  }
+  function adhanStopp() {
+    try { if (adhanEl) { adhanEl.pause(); adhanEl = null; } if (adhanUrl) { URL.revokeObjectURL(adhanUrl); adhanUrl = ""; } } catch (e) {}
+    stoppZeigen(false);
+  }
   function adhanPruefen() {
     if (!tonAn || !z.einstellungen.adhan || !gebetDaten || gebetDaten.fehler || !gebetDaten.heute) return;
     var n = new Date(), heute = ymd(n); if (gebetDaten.tag !== heute) return;
     var min = n.getHours() * 60 + n.getMinutes(), zuletzt = ""; try { zuletzt = localStorage.getItem("adhanZuletzt") || ""; } catch (e) {}
     for (var i = 0; i < gebetDaten.heute.length; i++) {
       var t = gebetDaten.heute[i].split(":"), m = +t[0] * 60 + +t[1], kz = heute + "-" + i;
-      if (min >= m && min <= m + 1 && zuletzt !== kz) { try { localStorage.setItem("adhanZuletzt", kz); } catch (e) {} adhanSpielen(); break; }
+      if (min >= m && min <= m + 1 && zuletzt !== kz) { try { localStorage.setItem("adhanZuletzt", kz); } catch (e) {} adhanSpielen(i); break; }
     }
   }
 
@@ -660,7 +681,7 @@
       var sa = el("div", "segment");
       [[false, "Aus"], [true, "An"]].forEach(function (o) { var k = el("button", !!z.einstellungen.adhan === o[0] ? "an" : "", o[1]); k.onclick = function () { audio(); aktion({ op: "einstellung", adhan: o[0] }); }; sa.appendChild(k); });
       b.appendChild(sa);
-      var dh = el("div", "klein", "Hinweis zum Test: Deine Einträge (Namen, Aufgaben, Termine) liegen auf einem Server in Frankfurt (Supabase). Anouar Badour, der den Test betreibt, kann sie technisch einsehen und nutzt sie nur für den Test. Zum Löschen sag ihm einfach Bescheid."); dh.style.marginTop = "16px"; b.appendChild(dh);
+      var dh = el("div", "klein", HINWEIS); dh.style.marginTop = "16px"; b.appendChild(dh);
       var cb = inp("checkbox", ""); cb.checked = gelesen; cb.onchange = function () { gelesen = cb.checked; };
       var cz = el("label", "klein", " Ich habe den Hinweis gelesen."); cz.insertBefore(cb, cz.firstChild); cz.style.display = "block"; cz.style.margin = "10px 0"; b.appendChild(cz);
       var ok = el("button", "blau", "Fertig, los geht’s");
@@ -718,6 +739,20 @@
     var ok = el("button", "blau", "+ Hinzufügen"); ok.onclick = function () { if (nn.value.trim()) aktion({ op: "person_neu", name: nn.value, farbe: FARBEN[z.personen.length % FARBEN.length] }); };
     var r = el("div", "zeile"); r.appendChild(nn); r.appendChild(ok); b.appendChild(r);
   }
+  var HINWEIS = "Hinweis zum Test: Deine Einträge (Namen, Aufgaben, Termine) liegen auf einem Server in Frankfurt (Supabase). Anouar Badour, der den Test betreibt, kann sie technisch einsehen und nutzt sie nur für den Test. Zum Löschen sag ihm einfach Bescheid.";
+  function adhanDatei(b, titel, schl, index) {
+    var name = eigenName(schl), t = el("div", "klein", titel + ": " + (name ? "eigene Datei „" + name + "“" : (schl === "fadjr" ? "wie die anderen Gebete" : "mitgelieferte Aufnahme"))); t.style.marginTop = "12px"; b.appendChild(t);
+    var f = inp("file", ""); f.accept = "audio/*";
+    f.onchange = function () {
+      var d = f.files && f.files[0]; if (!d) return;
+      if (d.size > 12 * 1024 * 1024) { alert("Die Datei ist zu groß (höchstens 12 MB)."); return; }
+      tonSchreiben(schl, d, function (ok) { if (!ok) { alert("Speichern auf diesem Gerät hat nicht geklappt."); return; } try { localStorage.setItem("adhanEigen_" + schl, d.name); } catch (e) {} if (neuBauen) neuBauen(); });
+    };
+    b.appendChild(f);
+    var z1 = el("div", "zeile"), an = el("button", "", "Anhören"); an.onclick = function () { audio(); adhanSpielen(index); }; z1.appendChild(an);
+    if (name) { var w = el("button", "", "Eigene Datei entfernen"); w.onclick = function () { tonSchreiben(schl, null, function () { try { localStorage.removeItem("adhanEigen_" + schl); } catch (e) {} if (neuBauen) neuBauen(); }); }; z1.appendChild(w); }
+    b.appendChild(z1);
+  }
   function ortSuchfeld(b) {
     var s = inp("text", "", "Stadt oder Ort suchen"); var go = el("button", "blau", "Suchen"); var erg = el("div"); erg.style.marginTop = "8px";
     function suche() {
@@ -747,7 +782,11 @@
     [[false, "Aus"], [true, "An"]].forEach(function (o) { var k = el("button", !!z.einstellungen.adhan === o[0] ? "an" : "", o[1]); k.onclick = function () { audio(); aktion({ op: "einstellung", adhan: o[0] }); }; sa.appendChild(k); });
     var gz = zeile("Gebetsruf zu den Gebetszeiten", sa); gz.style.marginTop = "16px"; b.appendChild(gz);
     b.appendChild(el("div", "klein", "Der Gebetsruf erklingt nur bei eingeschaltetem Ton (🔔) und wenn die Seite geöffnet ist."));
-    var te = el("button", "", "Gebetsruf anhören"); te.onclick = function () { audio(); adhanSpielen(); }; b.appendChild(te);
+    var te = el("button", "", "Gebetsruf anhören"); te.onclick = function () { audio(); adhanSpielen(1); }; b.appendChild(te);
+    var th = el("h3", "", "Eigene Stimme für den Gebetsruf"); th.style.marginTop = "22px"; b.appendChild(th);
+    b.appendChild(el("div", "klein", "Du kannst eine eigene Audiodatei wählen (zum Beispiel die Stimme deiner Moschee). Sie bleibt nur auf diesem Gerät. Der Fadjr-Gebetsruf hat den Zusatz „as-salatu khayrun minan-nawm“, dafür gibt es eine eigene Datei."));
+    adhanDatei(b, "Gebetsruf für Dohr, Assr, Maghrib, Ishaa", "standard", 1);
+    adhanDatei(b, "Gebetsruf für Fadjr", "fadjr", 0);
 
     var gp = gebetParam(), ueb = el("h3", "", "Gebetszeiten berechnen"); ueb.style.marginTop = "22px"; b.appendChild(ueb);
     b.appendChild(el("div", "klein", "Ohne Moschee-Kürzel rechnet der Planer die Zeiten selbst aus dem Sonnenstand. Aktuell: Fadjr " + gp.fw + "°, " + (gp.iwMin ? "Ishaa Maghrib + " + gp.iwMin + " Min." : "Ishaa " + gp.iw + "°") + ", Assr " + (gp.af === 2 ? "Hanafi" : "Standard") + "."));
@@ -766,6 +805,7 @@
       aktion({ op: "einstellung", gebet: r });
     };
     b.appendChild(ak);
+    var ht = el("h3", "", "Hinweis zum Test"); ht.style.marginTop = "22px"; b.appendChild(ht); b.appendChild(el("div", "klein", HINWEIS));
     var zu = el("button", "", "Standard: Fadjr 18°, Ishaa 17°"); zu.onclick = function () { aktion({ op: "einstellung", gebet: { fw: 18, iw: 17, iwMin: 0, af: 1, aus: [0, 0, 0, 0, 0] } }); }; b.appendChild(zu);
   }
 
