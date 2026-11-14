@@ -6,6 +6,7 @@
 <title>Familienplaner</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#0A84FF">
 <style>
   :root { --bg:#F2F2F7; --karte:#FFFFFF; --text:#1C1C1E; --text2:#8E8E93; --linie:rgba(60,60,67,.14); --glas:rgba(242,242,247,.82); --feld:rgba(118,118,128,.12); --blau:#0A84FF; }
@@ -289,6 +290,12 @@
       }
       if ("moschee" in a) { var mo = String(a.moschee || "").trim().toLowerCase(); if (mo && !/^[a-z0-9][a-z0-9-]{0,60}$/.test(mo)) throw new Error("Moschee-Kürzel ungültig"); n.einstellungen.moschee = mo; }
       if ("adhan" in a) n.einstellungen.adhan = !!a.adhan;
+      if ("gebet" in a) {
+        var gb = a.gebet || {}, gfw = +gb.fw, giw = +gb.iw, gim = Math.round(+gb.iwMin || 0), gaf = +gb.af, gau = [];
+        if (!(gfw >= 5 && gfw <= 24 && giw >= 5 && giw <= 24 && (gaf === 1 || gaf === 2) && gim >= 0 && gim <= 180)) throw new Error("Gebetsrechnung ungültig");
+        for (var gq = 0; gq < 5; gq++) gau.push(Math.max(-60, Math.min(60, Math.round(+(gb.aus && gb.aus[gq]) || 0))));
+        n.einstellungen.gebet = { fw: Math.round(gfw * 10) / 10, iw: Math.round(giw * 10) / 10, iwMin: gim, af: gaf, aus: gau };
+      }
     } else throw new Error("Unbekannte Aktion");
     var tage = []; for (var dd in n.verlauf) tage.push(dd); tage.sort();
     if (tage.length > 200) for (i = 0; i < tage.length - 150; i++) delete n.verlauf[tage[i]];
@@ -303,8 +310,8 @@
       else alert("Speichern hat nicht geklappt. Bitte noch einmal versuchen.");
     });
   }
-  function aktion(a, danach) { aktionRoh(a, function () { if (danach) danach(); if (modalOffen && neuBauen) neuBauen(); else zeichne(); }); }
-  function lesen() { senden("POST", "/rest/v1/rpc/planer_lesen", { k: KEY }, function (neu) { z = neu; if (!wetter) wetterLaden(); if (!gebetDaten) gebetLaden(); if (!modalOffen) zeichne(); }, true); }
+  function aktion(a, danach) { aktionRoh(a, function () { gebetPruefen(); if (danach) danach(); if (modalOffen && neuBauen) neuBauen(); else zeichne(); }); }
+  function lesen() { senden("POST", "/rest/v1/rpc/planer_lesen", { k: KEY }, function (neu) { z = neu; if (!wetter) wetterLaden(); gebetPruefen(); if (!modalOffen) zeichne(); }, true); }
   function holen() {
     if (gesperrt) return;
     if (!KEY) { sperre(); return; }
@@ -371,9 +378,76 @@
     }
   }
 
+  /* ---------- Gebetszeiten berechnen (eigene Rechnung aus dem Sonnenstand, keine fremde Schnittstelle) ---------- */
+  var Gebet = (function () {
+    var R = Math.PI / 180;
+    function sin(d) { return Math.sin(d * R); } function cos(d) { return Math.cos(d * R); } function tan(d) { return Math.tan(d * R); }
+    function asin(x) { return Math.asin(x) / R; } function acos(x) { return Math.acos(x) / R; } function atan2(y, x) { return Math.atan2(y, x) / R; } function acot(x) { return Math.atan(1 / x) / R; }
+    function fix(a, m) { a = a - m * Math.floor(a / m); return a < 0 ? a + m : a; }
+    function julian(y, m, d) { if (m <= 2) { y -= 1; m += 12; } var A = Math.floor(y / 100), B = 2 - A + Math.floor(A / 4); return Math.floor(365.25 * (y + 4716)) + Math.floor(30.6001 * (m + 1)) + d + B - 1524.5; }
+    function sonne(jd) {
+      var D = jd - 2451545.0, g = fix(357.529 + 0.98560028 * D, 360), q = fix(280.459 + 0.98564736 * D, 360),
+        L = fix(q + 1.915 * sin(g) + 0.020 * sin(2 * g), 360), e = 23.439 - 0.00000036 * D, RA = fix(atan2(cos(e) * sin(L), cos(L)) / 15, 24);
+      return { dekl: asin(sin(e) * sin(L)), gl: q / 15 - RA };
+    }
+    function p2(n) { return (n < 10 ? "0" : "") + n; }
+    function hm(t) { t = fix(t + 0.5 / 60, 24); var h = Math.floor(t), mi = Math.floor((t - h) * 60); return p2(h) + ":" + p2(mi); }
+    // Rohzeiten in Stunden: [Fadjr, Dohr, Assr, Maghrib, Ishaa]; fw/iw = Winkel Fadjr/Ishaa, af = Assr-Faktor (1 oder 2)
+    function roh(y, m, d, lat, lon, fw, iw, af, iwMin) {
+      var jd = julian(y, m, d) - lon / (15 * 24), tz = -new Date(y, m - 1, d, 12).getTimezoneOffset() / 60;
+      function mitt(t) { return fix(12 - sonne(jd + t).gl, 24); }
+      function winkel(w, t, ccw) { var s = sonne(jd + t), c = (-sin(w) - sin(s.dekl) * sin(lat)) / (cos(s.dekl) * cos(lat)); if (c < -1 || c > 1) return NaN; var tt = acos(c) / 15; return mitt(t) + (ccw ? -tt : tt); }
+      function asr(f, t) { var s = sonne(jd + t); return winkel(-acot(f + tan(Math.abs(lat - s.dekl))), t, false); }
+      var fajr = winkel(fw, 5 / 24, true), sr = winkel(0.833, 6 / 24, true), dh = mitt(12 / 24), as = asr(af, 13 / 24), ss = winkel(0.833, 18 / 24, false), ish = winkel(iw, 18 / 24, false);
+      var zs = tz - lon / 15; fajr += zs; sr += zs; dh += zs; as += zs; ss += zs; ish += zs;
+      var nacht = fix(sr - ss, 24);
+      function hl(zeit, basis, w, ccw) { var anteil = w / 60 * nacht, diff = ccw ? fix(basis - zeit, 24) : fix(zeit - basis, 24); if (isNaN(zeit) || diff > anteil) zeit = basis + (ccw ? -anteil : anteil); return zeit; }
+      fajr = hl(fajr, sr, fw, true); ish = iwMin > 0 ? ss + iwMin / 60 : hl(ish, ss, iw, false);
+      return [fajr, dh, as, ss, ish];
+    }
+    // Anzeige als "hh:mm", aus = Minuten-Ausgleich je Gebet
+    // o = { fw, iw, iwMin (Ishaa feste Minuten nach Maghrib, 0 = Winkel), af, aus }
+    function zeiten(y, m, d, lat, lon, o) {
+      var t = roh(y, m, d, lat, lon, o.fw, o.iw, o.af, o.iwMin), r = [];
+      for (var i = 0; i < 5; i++) r.push(hm(t[i] + ((o.aus && o.aus[i]) || 0) / 60));
+      return r;
+    }
+    function min(s) { var p = String(s).split(":"); return (+p[0]) * 60 + (+p[1]); }
+    // Abgleich: aus den Zeiten der Moschee (5 Texte hh:mm) den Winkel für Fadjr und Ishaa sowie den Ausgleich für Dohr, Assr, Maghrib bestimmen
+    function abgleich(y, m, d, lat, lon, af, ziel) {
+      function suche(i, soll) {
+        var lo = 5, hi = 24, w, k, dm;
+        for (k = 0; k < 40; k++) {
+          w = (lo + hi) / 2; var t = roh(y, m, d, lat, lon, i === 0 ? w : 18, i === 4 ? w : 17, af, 0)[i] * 60;
+          dm = t - soll; if (dm > 720) dm -= 1440; if (dm < -720) dm += 1440;
+          if (i === 0 ? dm > 0 : dm < 0) lo = w; else hi = w;   // größerer Winkel: Fadjr früher, Ishaa später
+        }
+        return Math.round(w * 10) / 10;
+      }
+      var lueck = min(ziel[4]) - min(ziel[3]), iwMin = (lueck % 5 === 0 && lueck >= 60 && lueck <= 130) ? lueck : 0;
+      var fw = suche(0, min(ziel[0])), iw = iwMin ? 17 : suche(4, min(ziel[4])), t = roh(y, m, d, lat, lon, fw, iw, af, iwMin), aus = [0, 0, 0, 0, 0];
+      for (var i = 1; i < 4; i++) { var dm = min(ziel[i]) - Math.round(t[i] * 60); aus[i] = Math.max(-30, Math.min(30, dm)); }
+      return { fw: fw, iw: iw, iwMin: iwMin, af: af, aus: aus };
+    }
+    return { zeiten: zeiten, abgleich: abgleich };
+  })();
+
   /* ---------- Gebetszeiten ---------- */
   var gebetDaten = null, GNAMEN = ["Fadjr", "Dohr", "Assr", "Maghrib", "Ishaa"];
-  function gebetLaden() { var p = ortPunkt(); senden("GET", "/functions/v1/dienste?art=gebet&lat=" + p.lat + "&lon=" + p.lon + "&m=" + encodeURIComponent(z.einstellungen.moschee || ""), null, function (g) { if (g.fehler) { if (!gebetDaten || gebetDaten.fehler) gebetDaten = g; setTimeout(gebetLaden, 120000); } else gebetDaten = g; if (!modalOffen) zeichne(); }, true); }
+  function gebetParam() { var g = z.einstellungen.gebet || {}; return { fw: g.fw || 18, iw: g.iw || 17, iwMin: g.iwMin || 0, af: g.af || 1, aus: g.aus || [0, 0, 0, 0, 0] }; }
+  function gebetRechnen() {
+    var p = ortPunkt(), o = gebetParam(), h = new Date(), m = new Date(h.getTime() + 86400000), ort = z.einstellungen.ort;
+    var beschr = "Fadjr " + o.fw + "°, Ishaa " + (o.iwMin ? "Maghrib + " + o.iwMin + " Min." : o.iw + "°");
+    gebetDaten = { quelle: "Berechnet für " + (ort ? ort.name : "Bergheim") + " (" + beschr + ")", tag: ymd(h),
+      heute: Gebet.zeiten(h.getFullYear(), h.getMonth() + 1, h.getDate(), p.lat, p.lon, o), morgen: Gebet.zeiten(m.getFullYear(), m.getMonth() + 1, m.getDate(), p.lat, p.lon, o) };
+  }
+  function gebetLaden() {
+    gebetRechnen(); if (!modalOffen) zeichne();
+    var mo = z.einstellungen.moschee || ""; if (!mo) return; var p = ortPunkt();
+    senden("GET", "/functions/v1/dienste?art=gebet&lat=" + p.lat + "&lon=" + p.lon + "&m=" + encodeURIComponent(mo), null, function (g) { if (!g.fehler && String(g.quelle).indexOf("(Mawaqit)") > 0) { gebetDaten = g; if (!modalOffen) zeichne(); } }, true);
+  }
+  var gebetSchl = "";
+  function gebetPruefen() { var e = z.einstellungen, s = JSON.stringify([e.moschee || "", e.ort, e.gebet || null, ymd(new Date())]); if (s !== gebetSchl) { gebetSchl = s; gebetLaden(); } }
   function gebetKarte(d) {
     var k = el("div", "karte gebetK"); var h = el("h2", "", "Gebetszeiten"); k.appendChild(h);
     if (!gebetDaten) { k.appendChild(el("div", "klein", "Wird geladen …")); return k; }
@@ -633,13 +707,32 @@
     var kopf = el("div", "klein", "Moschee bei Mawaqit: " + (mos ? mos : "keine (Zeiten werden berechnet)")); kopf.style.marginTop = "16px"; b.appendChild(kopf);
     b.appendChild(el("div", "klein", "Kürzel aus der Adresse, zum Beispiel mawaqit.net/de/m/rahman-kerpen → rahman-kerpen"));
     var mi = inp("text", mos, "Moschee-Kürzel"); var mk = el("button", "blau", "Speichern");
-    mk.onclick = function () { aktion({ op: "einstellung", moschee: mi.value }, function () { gebetDaten = null; gebetLaden(); }); };
+    mk.onclick = function () { aktion({ op: "einstellung", moschee: mi.value }); };
     var mz = el("div", "zeile"); mz.appendChild(mi); mz.appendChild(mk); b.appendChild(mz);
     var sa = el("div", "segment");
     [[false, "Aus"], [true, "An"]].forEach(function (o) { var k = el("button", !!z.einstellungen.adhan === o[0] ? "an" : "", o[1]); k.onclick = function () { audio(); aktion({ op: "einstellung", adhan: o[0] }); }; sa.appendChild(k); });
     var gz = zeile("Gebetsruf zu den Gebetszeiten", sa); gz.style.marginTop = "16px"; b.appendChild(gz);
     b.appendChild(el("div", "klein", "Der Gebetsruf erklingt nur bei eingeschaltetem Ton (🔔) und wenn die Seite geöffnet ist."));
     var te = el("button", "", "Gebetsruf anhören"); te.onclick = function () { audio(); adhanSpielen(); }; b.appendChild(te);
+
+    var gp = gebetParam(), ueb = el("h3", "", "Gebetszeiten berechnen"); ueb.style.marginTop = "22px"; b.appendChild(ueb);
+    b.appendChild(el("div", "klein", "Ohne Moschee-Kürzel rechnet der Planer die Zeiten selbst aus dem Sonnenstand. Aktuell: Fadjr " + gp.fw + "°, " + (gp.iwMin ? "Ishaa Maghrib + " + gp.iwMin + " Min." : "Ishaa " + gp.iw + "°") + ", Assr " + (gp.af === 2 ? "Hanafi" : "Standard") + "."));
+    var sg = el("div", "segment");
+    [[1, "Standard"], [2, "Hanafi"]].forEach(function (o) { var k = el("button", gp.af === o[0] ? "an" : "", o[1]); k.onclick = function () { aktion({ op: "einstellung", gebet: { fw: gp.fw, iw: gp.iw, iwMin: gp.iwMin, af: o[0], aus: gp.aus } }); }; sg.appendChild(k); });
+    var az = zeile("Assr-Zeit", sg); az.style.marginTop = "12px"; b.appendChild(az);
+    var ab = el("div", "klein", "Zeiten deiner Moschee für heute eintragen: Die Rechnung gleicht sich an (am besten zwischen Oktober und März). Die Moschee behält Vorrang, Fadjr kann um einige Minuten abweichen."); ab.style.marginTop = "12px"; b.appendChild(ab);
+    var fe = [];
+    GNAMEN.forEach(function (nm) { var f = inp("text", "", "hh:mm"); f.style.width = "90px"; fe.push(f); b.appendChild(zeile(nm, f)); });
+    var ak = el("button", "blau", "Mit Moschee abgleichen");
+    ak.onclick = function () {
+      var ziel = [], i, t;
+      for (i = 0; i < 5; i++) { t = fe[i].value.trim().replace(".", ":"); if (!/^\d{1,2}:\d{2}$/.test(t) || +t.split(":")[0] > 23 || +t.split(":")[1] > 59) { alert(GNAMEN[i] + ": bitte Uhrzeit wie 06:25 eintragen."); return; } ziel.push(z2(+t.split(":")[0]) + ":" + t.split(":")[1]); }
+      if (!(mins(ziel[0]) < mins(ziel[1]) && mins(ziel[1]) < mins(ziel[2]) && mins(ziel[2]) < mins(ziel[3]) && mins(ziel[3]) < mins(ziel[4]))) { alert("Die Zeiten müssen von Fadjr bis Ishaa aufsteigend sein."); return; }
+      var n = new Date(), pt = ortPunkt(), r = Gebet.abgleich(n.getFullYear(), n.getMonth() + 1, n.getDate(), pt.lat, pt.lon, gp.af, ziel);
+      aktion({ op: "einstellung", gebet: r });
+    };
+    b.appendChild(ak);
+    var zu = el("button", "", "Standard: Fadjr 18°, Ishaa 17°"); zu.onclick = function () { aktion({ op: "einstellung", gebet: { fw: 18, iw: 17, iwMin: 0, af: 1, aus: [0, 0, 0, 0, 0] } }); }; b.appendChild(zu);
   }
 
   /* ---------- Start ---------- */
