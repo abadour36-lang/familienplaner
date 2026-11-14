@@ -5,7 +5,7 @@ self.addEventListener("install", function (e) {
 });
 self.addEventListener("activate", function (e) { e.waitUntil(self.clients.claim()); });
 self.addEventListener("fetch", function (e) {
-  if (e.request.method !== "GET" || e.request.url.indexOf(self.location.origin) !== 0) return;
+  if (e.request.method !== "GET" || e.request.url.indexOf(self.location.origin) !== 0 || /\.(mp3|ogg)(\?|$)/.test(e.request.url)) return;
   e.respondWith(
     fetch(e.request).then(function (r) {
       var kopie = r.clone(); caches.open(NAME).then(function (c) { c.put(e.request, kopie); }); return r;
