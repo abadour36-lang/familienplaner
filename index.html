@@ -203,9 +203,11 @@
   var SB = "https://ufvtgmqroiozlxtbuimx.supabase.co";
   var ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVmdnRnbXFyb2lvemx4dGJ1aW14Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQxMzcyMjQsImV4cCI6MjEwOTcxMzIyNH0.JGA28sc-LQB07NI0voIf6tVx1l3amkpilpAJWmupZT0";
   var KEY = "";
+  // Kurzer Schlüssel zum Abtippen: vier Gruppen zu je vier Zeichen (Kleinbuchstaben und Ziffern), mit oder ohne Bindestriche
+  function schluesselNormal(s) { s = String(s || "").trim(); return /^[a-z2-9]{4}([\s-]?[a-z2-9]{4}){3}$/i.test(s) ? s.replace(/[\s-]/g, "").toLowerCase() : s; }
   (function () {
-    var m = /[#&]k=([A-Za-z0-9_\-]+)/.exec(location.hash);
-    try { if (m) localStorage.setItem("planerKey", m[1]); KEY = (m && m[1]) || localStorage.getItem("planerKey") || ""; } catch (e) { KEY = m ? m[1] : ""; }
+    var m = /[#&]k=([A-Za-z0-9_\-]+)/.exec(location.hash), w = m ? schluesselNormal(m[1]) : "";
+    try { if (w) localStorage.setItem("planerKey", w); KEY = w || localStorage.getItem("planerKey") || ""; } catch (e) { KEY = w; }
     try { if (m && history.replaceState) history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
   })();
   var gesperrt = false;
@@ -226,7 +228,11 @@
   function sperre() {
     gesperrt = true; var m = $("inhalt"); leeren(m);
     var k = el("div", "karte"); k.appendChild(el("h2", "", "Zugang fehlt"));
-    k.appendChild(el("div", "", "Dieser Planer braucht den Familien-Schlüssel. Bitte den Link öffnen, den du von Anouar bekommen hast.")); m.appendChild(k);
+    k.appendChild(el("div", "", KEY ? "Der Schlüssel passt nicht. Bitte noch einmal eintragen, am besten kopieren statt tippen." : "Dieser Planer braucht den Familien-Schlüssel. Öffne den Link von Anouar oder trage den Schlüssel hier ein."));
+    var f = inp("text", "", "Schlüssel, zum Beispiel k7m2-x9qd-4tbw-hn6p"); f.style.cssText = "width:100%;margin:12px 0"; f.setAttribute("autocapitalize", "none"); f.setAttribute("autocomplete", "off"); f.setAttribute("autocorrect", "off"); f.spellcheck = false;
+    var b = el("button", "blau", "Schlüssel speichern");
+    b.onclick = function () { var v = schluesselNormal(f.value); if (v.length < 12) { alert("Bitte den ganzen Schlüssel eintragen."); return; } try { localStorage.setItem("planerKey", v); } catch (e) {} location.reload(); };
+    k.appendChild(f); k.appendChild(b); m.appendChild(k);
   }
 
   /* ---------- Änderungen anwenden (lokal), dann mit Versionsprüfung in die Cloud schreiben ---------- */
