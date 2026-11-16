@@ -97,6 +97,20 @@
   .einkauf.fertigE .hk { background: var(--blau); }
   .einkauf.fertigE .t { text-decoration: line-through; opacity: .5; }
   .einkauf .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .pkt { margin-left: auto; background: #FFD60A; color: #000; font-weight: 700; border-radius: 16px; min-height: 40px; padding: 0 12px; font-size: 18px; }
+  .punktGross { font-size: 40px; font-weight: 700; margin: 4px 0 12px; }
+  .gebW { margin: 0 0 10px; } .gebReihe { display: flex; margin-bottom: 4px; }
+  .gb { flex: 1; min-width: 0; min-height: 40px; padding: 0; font-size: 12px; border: 3px solid; background: transparent; border-radius: 12px; margin-right: 4px; }
+  .gb:last-child { margin-right: 0; } .gb.an { color: #fff; font-weight: 700; }
+  .ramadanK { margin-bottom: 16px; background: #1B2A4A; color: #fff; } .ramadanK .klein { color: #C7D2EE; }
+  .ramZeiten { display: flex; } .ramZeiten > div { flex: 1; } .ramZeiten b { display: block; font-size: 44px; line-height: 1.1; }
+  .ramadanK .chips button { background: rgba(255,255,255,.16); color: #fff; } .ramadanK .chips button.an { color: #fff; }
+  .schuleK { flex: 1.4; min-width: 280px; } .schuleK h2 { font-size: 18px; }
+  .schuleName { font-weight: 700; margin-top: 8px; display: flex; align-items: center; } .schuleName .punkt { margin-right: 8px; }
+  .mitteilung { background: var(--blau); color: #fff; border-radius: 20px; padding: 12px 18px; font-size: 22px; font-weight: 700; margin-bottom: 14px; text-align: center; }
+  .feier { display: flex; flex-wrap: wrap; margin-bottom: 12px; } .feier span { background: #30D158; color: #000; font-weight: 700; border-radius: 14px; padding: 4px 14px; margin: 0 8px 6px 0; }
+  .feier span.islam { background: #FFD60A; }
+  .segment.eng button { padding: 0 10px; font-size: 16px; }
   #ss { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200; background: #000; display: none; overflow: hidden; }
   #ss .bild { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0; -webkit-transition: opacity 2s; transition: opacity 2s; }
   #ss .bild.an { opacity: 1; }
@@ -287,20 +301,26 @@
     var tage = a.tage || []; if (!(tage instanceof Array)) throw new Error("Wochentage ungültig");
     var t2 = []; for (var j = 0; j < 7; j++) if (tage.indexOf(j) >= 0) t2.push(j);
     var d = dat(a.datum || ""); if (!t2.length && !d) throw new Error("Bitte Wochentage oder ein Datum wählen");
-    return { person: a.person, titel: txt(a.titel, 60, true), symbol: txt(a.symbol || "", 8, false), art: art, zeit: zei(a.zeit || ""), tage: t2, datum: d, ab: dat(a.ab || "") };
+    var pu = Math.round(+a.punkte); if (!(pu >= 0 && pu <= 100)) pu = 1;
+    return { person: a.person, titel: txt(a.titel, 60, true), symbol: txt(a.symbol || "", 8, false), art: art, zeit: zei(a.zeit || ""), tage: t2, datum: d, ab: dat(a.ab || ""), punkte: pu };
   }
   function wende(alt, a) {
     var n = JSON.parse(JSON.stringify(alt)), op = a.op, i, k;
     function pid(id) { for (var q = 0; q < n.personen.length; q++) if (n.personen[q].id === id) return true; return false; }
+    function konto(wer, dl) { if (!dl) return; n.konten = n.konten || {}; n.konten[wer] = Math.max(0, (n.konten[wer] || 0) + dl); }
+    function sch() { n.schule = n.schule || {}; n.schule.ha = n.schule.ha || []; n.schule.pr = n.schule.pr || []; n.schule.plan = n.schule.plan || {}; return n.schule; }
+    function kuerzen(obj, max) { var ks = []; for (var q in obj) ks.push(q); ks.sort(); for (var r = 0; r < ks.length - max; r++) delete obj[ks[r]]; }
     if (op === "person_neu") {
       if (n.personen.length >= 12) throw new Error("Zu viele Personen");
-      n.personen.push({ id: nid(), name: txt(a.name, 30, true), farbe: RF.test(a.farbe || "") ? a.farbe : FARBEN[n.personen.length % 6], symbol: txt(a.symbol || "", 8, false) });
+      n.personen.push({ id: nid(), name: txt(a.name, 30, true), farbe: RF.test(a.farbe || "") ? a.farbe : FARBEN[n.personen.length % 6], symbol: txt(a.symbol || "", 8, false), gebete: !!a.gebete });
     } else if (op === "person_aendern") {
-      for (i = 0; i < n.personen.length; i++) if (n.personen[i].id === a.id) { n.personen[i].name = txt(a.name, 30, true); if (RF.test(a.farbe || "")) n.personen[i].farbe = a.farbe; n.personen[i].symbol = txt(a.symbol || "", 8, false); }
+      for (i = 0; i < n.personen.length; i++) if (n.personen[i].id === a.id) { n.personen[i].name = txt(a.name, 30, true); if (RF.test(a.farbe || "")) n.personen[i].farbe = a.farbe; n.personen[i].symbol = txt(a.symbol || "", 8, false); n.personen[i].gebete = !!a.gebete; }
     } else if (op === "person_weg") {
       var weg = []; n.aufgaben = n.aufgaben.filter(function (t) { if (t.person === a.id) { weg.push(t.id); return false; } return true; });
       n.personen = n.personen.filter(function (p) { return p.id !== a.id; });
       for (var d in n.verlauf) for (i = 0; i < weg.length; i++) delete n.verlauf[d][weg[i]];
+      if (n.konten) delete n.konten[a.id];
+      if (n.schule) { n.schule.ha = (n.schule.ha || []).filter(function (h) { return h.person !== a.id; }); n.schule.pr = (n.schule.pr || []).filter(function (h) { return h.person !== a.id; }); if (n.schule.plan) delete n.schule.plan[a.id]; }
       for (i = 0; i < n.termine.length; i++) if (n.termine[i].person === a.id) n.termine[i].person = "";
     } else if (op === "termin_neu") {
       if (n.termine.length >= 2000) throw new Error("Zu viele Termine");
@@ -308,6 +328,47 @@
       n.termine.push({ id: nid(), titel: txt(a.titel, 80, true), datum: dat(a.datum, true), zeit: zei(a.zeit || ""), person: a.person || "" });
     } else if (op === "termin_weg") {
       n.termine = n.termine.filter(function (t) { return t.id !== a.id; });
+    } else if (op === "belohnung_neu") {
+      n.belohnungen = n.belohnungen || []; if (n.belohnungen.length >= 30) throw new Error("Zu viele Belohnungen");
+      var bp = Math.round(+a.preis); if (!(bp >= 1 && bp <= 1000)) throw new Error("Preis von 1 bis 1000 Punkten");
+      n.belohnungen.push({ id: nid(), titel: txt(a.titel, 50, true), symbol: txt(a.symbol || "🎁", 8, false) || "🎁", preis: bp });
+    } else if (op === "belohnung_weg") {
+      n.belohnungen = (n.belohnungen || []).filter(function (b) { return b.id !== a.id; });
+    } else if (op === "punkte_geben") {
+      if (!pid(a.person)) throw new Error("Person unbekannt"); var pg = Math.round(+a.anzahl); if (!(pg >= -1000 && pg <= 1000) || !pg) throw new Error("Punkte von -1000 bis 1000");
+      konto(a.person, pg);
+    } else if (op === "einloesen") {
+      var bl = null; for (i = 0; i < (n.belohnungen || []).length; i++) if (n.belohnungen[i].id === a.id) bl = n.belohnungen[i];
+      if (!bl || !pid(a.person)) throw new Error("Belohnung unbekannt");
+      if (((n.konten && n.konten[a.person]) || 0) < bl.preis) throw new Error("Zu wenige Punkte");
+      konto(a.person, -bl.preis); n.eingeloest = (n.eingeloest || []).concat([{ p: a.person, t: bl.titel, s: bl.symbol, k: bl.preis, d: dat(a.datum, true) }]).slice(-40);
+    } else if (op === "hausaufgabe_neu") {
+      if (!pid(a.person)) throw new Error("Person unbekannt"); var sh = sch(); if (sh.ha.length >= 100) throw new Error("Zu viele Hausaufgaben");
+      sh.ha.push({ id: nid(), person: a.person, titel: txt(a.titel, 60, true), faellig: dat(a.faellig || ""), fertig: false });
+    } else if (op === "hausaufgabe_haken") {
+      var sh2 = sch(); for (i = 0; i < sh2.ha.length; i++) if (sh2.ha[i].id === a.id) sh2.ha[i].fertig = !sh2.ha[i].fertig;
+    } else if (op === "hausaufgabe_weg") {
+      sch().ha = sch().ha.filter(function (h) { return h.id !== a.id; });
+    } else if (op === "hausaufgabe_leeren") {
+      sch().ha = sch().ha.filter(function (h) { return !h.fertig; });
+    } else if (op === "pruefung_neu") {
+      if (!pid(a.person)) throw new Error("Person unbekannt"); var sp = sch(); if (sp.pr.length >= 60) throw new Error("Zu viele Prüfungen");
+      sp.pr.push({ id: nid(), person: a.person, fach: txt(a.fach, 40, true), datum: dat(a.datum, true) });
+    } else if (op === "pruefung_weg") {
+      sch().pr = sch().pr.filter(function (h) { return h.id !== a.id; });
+    } else if (op === "plan_setzen") {
+      if (!pid(a.person)) throw new Error("Person unbekannt"); var wtg = Math.round(+a.tag); if (!(wtg >= 0 && wtg <= 4)) throw new Error("Wochentag ungültig");
+      var pl = sch().plan; pl[a.person] = pl[a.person] || {}; var ptx = txt(a.text || "", 160, false); if (ptx) pl[a.person][wtg] = ptx; else delete pl[a.person][wtg];
+    } else if (op === "gebet_haken") {
+      if (!pid(a.person)) throw new Error("Person unbekannt"); var gi = Math.round(+a.index); if (!(gi >= 0 && gi <= 4)) throw new Error("Gebet ungültig");
+      var gd = dat(a.datum, true); n.gebetLog = n.gebetLog || {}; n.gebetLog[gd] = n.gebetLog[gd] || {};
+      var gl = n.gebetLog[gd][a.person] || [0, 0, 0, 0, 0]; gl[gi] = gl[gi] ? 0 : 1; konto(a.person, gl[gi] ? 1 : -1);
+      if (gl.join("") === "00000") delete n.gebetLog[gd][a.person]; else n.gebetLog[gd][a.person] = gl;
+      kuerzen(n.gebetLog, 70);
+    } else if (op === "fasten_haken") {
+      if (!pid(a.person)) throw new Error("Person unbekannt"); var fd = dat(a.datum, true); n.fasten = n.fasten || {}; n.fasten[fd] = n.fasten[fd] || {};
+      if (n.fasten[fd][a.person]) delete n.fasten[fd][a.person]; else n.fasten[fd][a.person] = 1;
+      kuerzen(n.fasten, 70);
     } else if (op === "einkauf_neu") {
       n.einkauf = n.einkauf || []; if (n.einkauf.length >= 200) throw new Error("Die Einkaufsliste ist voll");
       n.einkauf.push({ id: nid(), titel: txt(a.titel, 60, true), fertig: false });
@@ -330,11 +391,12 @@
       if (!t) throw new Error("Aufgabe unbekannt");
       var tag = dat(a.datum, true), uhr = zei(a.zeit, true);
       if (!n.verlauf[tag]) n.verlauf[tag] = {}; if (!n.verlauf[tag][t.id]) n.verlauf[tag][t.id] = [];
-      var e = n.verlauf[tag][t.id];
+      var e = n.verlauf[tag][t.id], vor = e.length;
       if (op === "haken") { if (e.length) e.length = 0; else e.push({ z: uhr }); }
       else if (op === "plus") e.push({ z: uhr });
       else if (op === "minus" || op === "schlaf_zurueck") { if (e.length) e.pop(); }
       else if (op === "schlaf") { if (e.length && !e[e.length - 1].bis) e[e.length - 1].bis = uhr; else e.push({ z: uhr }); }
+      if (t.art !== "schlaf") konto(t.person, (e.length - vor) * (t.punkte == null ? 1 : t.punkte));
       if (!e.length) delete n.verlauf[tag][t.id];
     } else if (op === "einstellung") {
       if (a.raster === 2 || a.raster === 3) n.einstellungen.raster = a.raster;
@@ -344,6 +406,12 @@
       }
       if ("moschee" in a) { var mo = String(a.moschee || "").trim().toLowerCase(); if (mo && !/^[a-z0-9][a-z0-9-]{0,60}$/.test(mo)) throw new Error("Moschee-Kürzel ungültig"); n.einstellungen.moschee = mo; }
       if ("adhan" in a) n.einstellungen.adhan = !!a.adhan;
+      if ("mitteilung" in a) n.einstellungen.mitteilung = txt(a.mitteilung || "", 120, false);
+      if ("pin" in a) { var pn = String(a.pin || ""); if (pn && !/^\d{4}$/.test(pn)) throw new Error("Die PIN besteht aus 4 Ziffern"); n.einstellungen.pin = pn; }
+      if ("land" in a) { if (!/^(BW|BY|BE|BB|HB|HH|HE|MV|NI|NW|RP|SL|SN|ST|SH|TH)$/.test(a.land)) throw new Error("Bundesland ungültig"); n.einstellungen.land = a.land; }
+      if ("feiertage" in a) n.einstellungen.feiertage = !!a.feiertage;
+      if ("karten" in a) { var kk = a.karten || {}, ks = ["wetter", "gebet", "kalender", "schule", "einkauf"], k3 = {}; for (var kz = 0; kz < ks.length; kz++) k3[ks[kz]] = kk[ks[kz]] !== false; n.einstellungen.karten = k3; }
+      if ("ramadan" in a) { var rm = a.ramadan || {}; n.einstellungen.ramadan = { an: !!rm.an, start: dat(rm.start || "") }; }
       if ("kalender" in a) {
         var kl = a.kalender instanceof Array ? a.kalender : [], k2 = [];
         if (kl.length > 3) throw new Error("Höchstens 3 Kalender");
@@ -585,6 +653,143 @@
     }
     k.appendChild(st); return k;
   }
+  /* ---------- Feiertage (gesetzlich je Bundesland) und islamische Tage (Umm-al-Qura-Kalender) ---------- */
+  var feierCache = {}, hijriFmt = null, hijriGut = false;
+  function dtage(a, b) { return Math.round((parse(b).getTime() - parse(a).getTime()) / 86400000); }
+  function ostern(y) {
+    var a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+    return ymd(new Date(y, Math.floor((h + l - 7 * m + 114) / 31) - 1, ((h + l - 7 * m + 114) % 31) + 1));
+  }
+  function feiertageJahr(y, L) {
+    var o = ostern(y), m = {}, bd;
+    function ist(l) { return l.indexOf(L) >= 0; }
+    m[y + "-01-01"] = "Neujahr"; m[plus(o, -2)] = "Karfreitag"; m[plus(o, 1)] = "Ostermontag"; m[y + "-05-01"] = "Tag der Arbeit"; m[plus(o, 39)] = "Christi Himmelfahrt";
+    m[plus(o, 50)] = "Pfingstmontag"; m[y + "-10-03"] = "Tag der Deutschen Einheit"; m[y + "-12-25"] = "1. Weihnachtstag"; m[y + "-12-26"] = "2. Weihnachtstag";
+    if (ist(["BW", "BY", "ST"])) m[y + "-01-06"] = "Heilige Drei Könige";
+    if (ist(["BE", "MV"])) m[y + "-03-08"] = "Internationaler Frauentag";
+    if (ist(["BW", "BY", "HE", "NW", "RP", "SL"])) m[plus(o, 60)] = "Fronleichnam";
+    if (ist(["BW", "BY", "NW", "RP", "SL"])) m[y + "-11-01"] = "Allerheiligen";
+    if (ist(["BB", "HB", "HH", "MV", "NI", "SN", "ST", "SH", "TH"])) m[y + "-10-31"] = "Reformationstag";
+    if (L === "SL") m[y + "-08-15"] = "Mariä Himmelfahrt";
+    if (L === "TH") m[y + "-09-20"] = "Weltkindertag";
+    if (L === "SN") { bd = new Date(y, 10, 22); while (bd.getDay() !== 3) bd.setDate(bd.getDate() - 1); m[ymd(bd)] = "Buß- und Bettag"; }
+    return m;
+  }
+  try { hijriFmt = new Intl.DateTimeFormat("en-u-ca-islamic-umalqura", { year: "numeric", month: "numeric", day: "numeric" }); } catch (e) {}
+  function hijri(d) {
+    if (!hijriFmt || !hijriFmt.formatToParts) return null;
+    try { var dt = parse(d); dt.setHours(12); var p = hijriFmt.formatToParts(dt), r = {}; for (var i = 0; i < p.length; i++) r[p[i].type] = parseInt(p[i].value, 10); return r.month ? r : null; } catch (e) { return null; }
+  }
+  (function () { var h = hijri("2024-04-10"); hijriGut = !!(h && h.month === 10 && h.day === 1); })();
+  var ISLAM = { "9-1": "Ramadan beginnt", "10-1": "Eid al-Fitr", "12-9": "Arafat-Tag", "12-10": "Eid al-Adha", "1-1": "Islamisches Neujahr", "1-10": "Aschura" };
+  function feiertagVon(d) {
+    var l = [], e = z.einstellungen, L = e.land || "NW", y = +d.slice(0, 4), m;
+    if (e.feiertage !== false) { m = feierCache[y + L] || (feierCache[y + L] = feiertageJahr(y, L)); if (m[d]) l.push({ t: m[d], islam: false }); }
+    if (hijriGut) { var h = hijri(d); if (h && ISLAM[h.month + "-" + h.day]) l.push({ t: ISLAM[h.month + "-" + h.day] + " (±1 Tag)", islam: true }); }
+    return l;
+  }
+  function ramadanBeginnSuchen() { for (var i = 0; i < 420 && hijriGut; i++) { var d = plus(ymd(new Date()), i), h = hijri(d); if (h && h.month === 9 && h.day === 1) return d; } return ""; }
+  function ramadanTag(d) { var r = z.einstellungen.ramadan; if (!r || !r.an || !r.start) return 0; var n = dtage(r.start, d) + 1; return n >= 1 && n <= 30 ? n : 0; }
+
+  /* ---------- Eltern-PIN (Sperre gegen versehentliches Verstellen durch Kinder) ---------- */
+  var pinBis = 0;
+  function pinFrage(fertig) {
+    var pin = z.einstellungen.pin; if (!pin || new Date().getTime() < pinBis) { fertig(); return; }
+    fenster(function (b, zu) {
+      b.appendChild(el("h1", "", "Eltern-PIN"));
+      var f = inp("password", "", "PIN mit 4 Ziffern"); f.maxLength = 4; f.setAttribute("inputmode", "numeric"); f.setAttribute("autocomplete", "off"); b.appendChild(f);
+      var r = el("div", "zeile"); r.style.marginTop = "12px"; var ab = el("button", "", "Abbrechen"); ab.onclick = zu; var ok = el("button", "blau", "OK");
+      function pruefen() { if (f.value === pin) { pinBis = new Date().getTime() + 300000; zu(); fertig(); } else { f.value = ""; alert("Die PIN stimmt nicht."); } }
+      ok.onclick = pruefen; f.onkeydown = function (ev) { if (ev.keyCode === 13) pruefen(); }; r.appendChild(ab); r.appendChild(ok); b.appendChild(r);
+    });
+  }
+  function kartenAn(k) { var ks = z.einstellungen.karten; return !ks || ks[k] !== false; }
+
+  /* ---------- Punkte und Belohnungen ---------- */
+  function punkteVon(p) { return (z.konten && z.konten[p.id]) || 0; }
+  function belohnungFenster(p) {
+    fenster(function (b, zu) {
+      var h = el("h1", "", "Belohnungen für " + p.name); var f = el("button", "blau", "Fertig"); f.onclick = zu; h.appendChild(f); b.appendChild(h);
+      var pk = el("div", "punktGross", "⭐ " + punkteVon(p) + " Punkte"); b.appendChild(pk);
+      var l = z.belohnungen || []; if (!l.length) b.appendChild(el("div", "klein", "Noch keine Belohnungen. Die Eltern legen sie unter ⚙︎ → Belohnungen an."));
+      l.forEach(function (be) {
+        var e = el("div", "eintrag"); e.appendChild(el("span", "sy", be.symbol)); var tx = el("div", "t"); tx.appendChild(el("div", "", be.titel)); tx.appendChild(el("div", "klein", be.preis + " Punkte")); e.appendChild(tx);
+        var ok = punkteVon(p) >= be.preis, kn = el("button", ok ? "blau mini" : "mini", ok ? "Einlösen" : "fehlen " + (be.preis - punkteVon(p)));
+        kn.onclick = function (ev) { if (!ok) return; konfetti(ev.clientX, ev.clientY, true); aktion({ op: "einloesen", person: p.id, id: be.id, datum: ymd(new Date()) }); };
+        e.appendChild(kn); b.appendChild(e);
+      });
+      var ein = (z.eingeloest || []).filter(function (x) { return x.p === p.id; }).slice(-5).reverse();
+      if (ein.length) { var t = el("h3", "", "Zuletzt eingelöst"); t.style.marginTop = "16px"; b.appendChild(t); ein.forEach(function (x) { b.appendChild(el("div", "klein", x.s + " " + x.t + " · " + x.k + " Punkte · " + x.d)); }); }
+    });
+  }
+
+  /* ---------- Gebete abhaken (für Kinder) ---------- */
+  function gebetTag(p, d) { return (z.gebetLog && z.gebetLog[d] && z.gebetLog[d][p.id]) || [0, 0, 0, 0, 0]; }
+  function gebetReihe(p, d) {
+    var w = el("div", "gebW"), r = el("div", "gebReihe"), l = gebetTag(p, d), s = 0, voll = 0, i, j, dd, x, punkte = "";
+    for (j = 0; j < 5; j++) (function (idx) {
+      var k = el("button", "gb" + (l[idx] ? " an" : ""), GNAMEN[idx]); k.style.borderColor = p.farbe; if (l[idx]) k.style.background = p.farbe;
+      k.onclick = function (ev) { if (!l[idx]) konfetti(ev.clientX, ev.clientY, l[0] + l[1] + l[2] + l[3] + l[4] === 4); aktion({ op: "gebet_haken", person: p.id, datum: d, index: idx }); };
+      r.appendChild(k);
+    })(j);
+    w.appendChild(r);
+    for (i = 0; i < 7; i++) { dd = plus(wochenStart(d), i); x = gebetTag(p, dd); var n5 = 0; for (j = 0; j < 5; j++) n5 += x[j]; s += n5; if (n5 === 5) voll++; punkte += n5 === 5 ? "●" : (n5 ? "◐" : "○"); }
+    w.appendChild(el("div", "klein", "🕌 Gebete diese Woche: " + s + " von 35 · " + punkte + (voll >= 5 ? " · 🌟 Wochenstern" : "")));
+    return w;
+  }
+
+  /* ---------- Ramadan ---------- */
+  function ramadanKarte(d) {
+    var n = ramadanTag(d); if (!n) return null;
+    var k = el("div", "karte ramadanK"), h = el("h2", "", "🌙 Ramadan · Tag " + n); k.appendChild(h);
+    var heute = ymd(new Date()), zeiten = gebetDaten && !gebetDaten.fehler ? (d === heute ? gebetDaten.heute : (d === plus(heute, 1) ? gebetDaten.morgen : null)) : null;
+    if (zeiten) {
+      var zr = el("div", "ramZeiten"), a = el("div", ""), b = el("div", "");
+      a.appendChild(el("span", "klein", "Sahur endet (Fadjr)")); a.appendChild(el("b", "", zeiten[0])); b.appendChild(el("span", "klein", "Iftar (Maghrib)")); b.appendChild(el("b", "", zeiten[3]));
+      zr.appendChild(a); zr.appendChild(b); k.appendChild(zr);
+      if (d === heute) { var jetzt = hhmm(new Date()); k.appendChild(el("div", "naechstText", jetzt < zeiten[0] ? "Noch " + dauer(jetzt, zeiten[0]) + " bis Sahur endet" : (jetzt < zeiten[3] ? "Noch " + dauer(jetzt, zeiten[3]) + " bis Iftar" : "Iftar war um " + zeiten[3] + ". Gesegnete Mahlzeit!"))); }
+    }
+    var fr = el("div", "chips"); fr.style.marginTop = "10px";
+    z.personen.forEach(function (p) {
+      var tot = 0, ds = z.fasten || {}, q; for (q in ds) if (ds[q][p.id] && dtage(z.einstellungen.ramadan.start, q) >= 0 && dtage(z.einstellungen.ramadan.start, q) < 30) tot++;
+      var an = !!(ds[d] && ds[d][p.id]), kn = el("button", an ? "an" : "", (an ? "✓ " : "") + p.name + " fastet · " + tot + " Tage"); if (an) kn.style.background = p.farbe;
+      kn.onclick = function (ev) { if (!an) konfetti(ev.clientX, ev.clientY); aktion({ op: "fasten_haken", person: p.id, datum: d }); }; fr.appendChild(kn);
+    });
+    k.appendChild(fr); return k;
+  }
+
+  /* ---------- Schule ---------- */
+  function schuleDaten() { var s = z.schule || {}; return { ha: s.ha || [], pr: s.pr || [], plan: s.plan || {} }; }
+  function schuleHat() { var s = schuleDaten(), q, w; if (s.ha.length || s.pr.length) return true; for (q in s.plan) for (w in s.plan[q]) return true; return false; }
+  function hausaufgabeFormular(vorPerson) {
+    fenster(function (b, zu) {
+      b.appendChild(el("h1", "", "Neue Hausaufgabe"));
+      var pers = el("select"); z.personen.forEach(function (p) { var o = el("option", "", p.name); o.value = p.id; pers.appendChild(o); }); if (vorPerson) pers.value = vorPerson;
+      var titel = inp("text", "", "Was? (z. B. Mathe Seite 12)"); titel.maxLength = 60; var fa = inp("date", "");
+      b.appendChild(zeile("Für", pers)); b.appendChild(zeile("Aufgabe", titel)); b.appendChild(zeile("Bis", fa));
+      var r = el("div", "zeile"), ab = el("button", "", "Abbrechen"); ab.onclick = zu; var ok = el("button", "blau", "Speichern");
+      ok.onclick = function () { if (!titel.value.trim() || !pers.value) { alert("Bitte Person und Aufgabe eintragen."); return; } aktion({ op: "hausaufgabe_neu", person: pers.value, titel: titel.value, faellig: fa.value }); zu(); };
+      r.appendChild(ab); r.appendChild(ok); b.appendChild(r);
+    });
+  }
+  function schuleKarte(d) {
+    var k = el("div", "karte schuleK"), h = el("h2", "", "Schule 🎒"), s = schuleDaten(), heute = ymd(new Date()), w = dow(d);
+    var plus1 = el("button", "mini blau", "+ Hausaufgabe"); plus1.style.fontSize = "14px"; plus1.onclick = function () { hausaufgabeFormular(""); }; h.appendChild(plus1); k.appendChild(h);
+    z.personen.forEach(function (p) {
+      var ha = s.ha.filter(function (x) { return x.person === p.id; }), pr = s.pr.filter(function (x) { return x.person === p.id && x.datum >= heute && dtage(heute, x.datum) <= 21; }).sort(function (x, y) { return x.datum.localeCompare(y.datum); });
+      var pt = s.plan[p.id] && w < 5 ? s.plan[p.id][w] : ""; if (!ha.length && !pr.length && !pt) return;
+      var kopf = el("div", "schuleName"); var pk = el("span", "punkt"); pk.style.background = p.farbe; kopf.appendChild(pk); kopf.appendChild(document.createTextNode(p.name)); k.appendChild(kopf);
+      if (pt) k.appendChild(el("div", "klein", "Heute: " + pt));
+      ha.sort(function (x, y) { return (x.fertig ? 1 : 0) - (y.fertig ? 1 : 0); }).forEach(function (x) {
+        var r = el("div", "einkauf" + (x.fertig ? " fertigE" : "")); r.appendChild(el("span", "hk", x.fertig ? "✓" : "")); r.appendChild(el("span", "t", x.titel + (x.faellig ? " (bis " + x.faellig.slice(8) + "." + x.faellig.slice(5, 7) + ".)" : "")));
+        var wg = el("button", "x", "✕"); wg.onclick = function (ev) { ev.stopPropagation(); aktion({ op: "hausaufgabe_weg", id: x.id }); }; r.appendChild(wg);
+        r.onclick = function (ev) { if (!x.fertig) konfetti(ev.clientX, ev.clientY); aktion({ op: "hausaufgabe_haken", id: x.id }); }; k.appendChild(r);
+      });
+      pr.slice(0, 3).forEach(function (x) { var n = dtage(heute, x.datum); k.appendChild(el("div", "klein", "📝 " + x.fach + (n === 0 ? " heute" : n === 1 ? " morgen" : " in " + n + " Tagen") + " (" + x.datum.slice(8) + "." + x.datum.slice(5, 7) + ".)")); });
+    });
+    return k;
+  }
+
   /* ---------- Einkaufsliste ---------- */
   function einkaufKarte() {
     var k = el("div", "karte einkaufK"), h = el("h2", "", "Einkauf 🛒"), l = z.einkauf || [], hatFertig = false, i;
@@ -665,7 +870,9 @@
   function personSpalte(p, d) {
     var s = el("div", "spalte"); var l = aufgabenVon(p, d), c = zaehle(p, d);
     var kopf = el("div", "kopf"); var av = el("div", "avatar", anfang(p)); av.style.background = p.farbe; kopf.appendChild(av);
-    var tx = el("div", ""); tx.appendChild(el("div", "name", p.name)); tx.appendChild(el("div", "klein", c[1] ? c[0] + " von " + c[1] + " geschafft" : "keine Aufgaben")); kopf.appendChild(tx); s.appendChild(kopf);
+    var tx = el("div", ""); tx.appendChild(el("div", "name", p.name)); tx.appendChild(el("div", "klein", c[1] ? c[0] + " von " + c[1] + " geschafft" : "keine Aufgaben")); kopf.appendChild(tx);
+    var pkt = el("button", "pkt", "⭐ " + punkteVon(p)); pkt.onclick = function () { pinFrage(function () { belohnungFenster(p); }); }; kopf.appendChild(pkt); s.appendChild(kopf);
+    if (p.gebete) s.appendChild(gebetReihe(p, d));
     var b = el("div", "balken"); var bi = el("i"); bi.style.background = p.farbe; bi.style.width = (c[1] ? Math.round(c[0] / c[1] * 100) : 0) + "%"; b.appendChild(bi); s.appendChild(b);
     if (c[1] && c[0] === c[1]) { var fb = el("div", "fertigBanner", "🎉 Alles geschafft!"); fb.style.background = p.farbe; s.appendChild(fb); }
     if (!l.length) s.appendChild(el("div", "klein", "Heute nichts zu tun."));
@@ -684,7 +891,12 @@
   }
 
   function zeichneTag(m) {
-    var oben = el("div", "oben"); oben.appendChild(wetterKarte(tag)); oben.appendChild(gebetKarte(tag)); if (kalendarisch().length) oben.appendChild(kalenderKarte(tag)); oben.appendChild(einkaufKarte()); m.appendChild(oben);
+    var ms = z.einstellungen.mitteilung; if (ms) m.appendChild(el("div", "mitteilung", ms));
+    var fl = feiertagVon(tag); if (fl.length) { var fb = el("div", "feier"); fl.forEach(function (f) { fb.appendChild(el("span", f.islam ? "islam" : "", (f.islam ? "🌙 " : "🎉 ") + f.t)); }); m.appendChild(fb); }
+    var rk = ramadanKarte(tag); if (rk) m.appendChild(rk);
+    var oben = el("div", "oben"); if (kartenAn("wetter")) oben.appendChild(wetterKarte(tag)); if (kartenAn("gebet")) oben.appendChild(gebetKarte(tag));
+    if (kalendarisch().length && kartenAn("kalender")) oben.appendChild(kalenderKarte(tag)); if (schuleHat() && kartenAn("schule")) oben.appendChild(schuleKarte(tag)); if (kartenAn("einkauf")) oben.appendChild(einkaufKarte());
+    if (oben.childNodes.length) m.appendChild(oben);
     var sp = el("div", "spalten");
     if (!z.personen.length) sp.appendChild(el("div", "klein", "Noch keine Personen. Oben rechts auf ⚙︎ tippen."));
     for (var i = 0; i < z.personen.length; i++) sp.appendChild(personSpalte(z.personen[i], tag));
@@ -700,6 +912,7 @@
       k.appendChild(el("div", "nr", String(dd.getDate())));
       var tw = tagWetter(d); k.appendChild(el("div", "w", tw ? wIcon(tw.code) + " " + tw.max + "° / " + tw.min + "°" : MONATE[dd.getMonth()]));
       var tt = termineVon(d); for (var j = 0; j < tt.length; j++) { var c = el("span", "chip", (tt[j].zeit ? tt[j].zeit + " " : "") + tt[j].titel); c.style.background = farbeVon(tt[j].person); k.appendChild(c); }
+      var fw = feiertagVon(d); for (var j3 = 0; j3 < fw.length; j3++) { var c3 = el("span", "chip", fw[j3].t); c3.style.background = fw[j3].islam ? "#B8860B" : "#248A3D"; k.appendChild(c3); }
       var kt = kalVon(d); for (var j2 = 0; j2 < kt.length; j2++) { var c2 = el("span", "chip", (kt[j2].z ? kt[j2].z + " " : "") + kt[j2].t); c2.style.background = "#64748B"; k.appendChild(c2); }
       for (var q = 0; q < z.personen.length; q++) {
         var p = z.personen[q], n = zaehle(p, d); if (!n[1]) continue;
@@ -841,6 +1054,41 @@
     if (anz) { var lo = el("button", "", "Eigene Fotos entfernen"); lo.onclick = function () { ssFotosLoeschen(function () { if (neuBauen) neuBauen(); }); }; r.appendChild(lo); }
     b.appendChild(r);
   }
+  var LAENDER = [["BW", "Baden-Württemberg"], ["BY", "Bayern"], ["BE", "Berlin"], ["BB", "Brandenburg"], ["HB", "Bremen"], ["HH", "Hamburg"], ["HE", "Hessen"], ["MV", "Mecklenburg-Vorpommern"], ["NI", "Niedersachsen"], ["NW", "Nordrhein-Westfalen"], ["RP", "Rheinland-Pfalz"], ["SL", "Saarland"], ["SN", "Sachsen"], ["ST", "Sachsen-Anhalt"], ["SH", "Schleswig-Holstein"], ["TH", "Thüringen"]];
+  function bauErweitert(b) {
+    var e = z.einstellungen, th = el("h3", "", "Mitteilung an die Familie"); th.style.marginTop = "22px"; b.appendChild(th);
+    b.appendChild(el("div", "klein", "Steht groß ganz oben auf dem Tag. Leer lassen, um sie zu entfernen."));
+    var mi = inp("text", e.mitteilung || "", "z. B. Heute Oma besuchen"); mi.maxLength = 120; var mk = el("button", "blau", "Speichern"); mk.onclick = function () { aktion({ op: "einstellung", mitteilung: mi.value }); };
+    var mr = el("div", "zeile"); mr.appendChild(mi); mr.appendChild(mk); b.appendChild(mr);
+    var tk = el("h3", "", "Karten auf dem Tag"); tk.style.marginTop = "22px"; b.appendChild(tk);
+    var kc = el("div", "chips"), ks = e.karten || {};
+    [["wetter", "Wetter"], ["gebet", "Gebetszeiten"], ["kalender", "Kalender"], ["schule", "Schule"], ["einkauf", "Einkauf"]].forEach(function (o) {
+      var an = ks[o[0]] !== false, k = el("button", an ? "an" : "", (an ? "✓ " : "") + o[1]);
+      k.onclick = function () { var neu = {}; [["wetter"], ["gebet"], ["kalender"], ["schule"], ["einkauf"]].forEach(function (q) { neu[q[0]] = q[0] === o[0] ? !an : ks[q[0]] !== false; }); aktion({ op: "einstellung", karten: neu }); };
+      kc.appendChild(k);
+    });
+    b.appendChild(kc); b.appendChild(el("div", "klein", "Kalender und Schule erscheinen nur, wenn dafür etwas eingerichtet ist."));
+    var tf = el("h3", "", "Feiertage"); tf.style.marginTop = "22px"; b.appendChild(tf);
+    var sf = el("div", "segment"); [[true, "An"], [false, "Aus"]].forEach(function (o) { var k = el("button", (e.feiertage !== false) === o[0] ? "an" : "", o[1]); k.onclick = function () { aktion({ op: "einstellung", feiertage: o[0] }); }; sf.appendChild(k); });
+    b.appendChild(zeile("Feiertage zeigen", sf));
+    var bl = el("select"); LAENDER.forEach(function (o) { var op = el("option", "", o[1]); op.value = o[0]; bl.appendChild(op); }); bl.value = e.land || "NW"; bl.onchange = function () { aktion({ op: "einstellung", land: bl.value }); };
+    b.appendChild(zeile("Bundesland", bl));
+    b.appendChild(el("div", "klein", hijriGut ? "Islamische Tage (Eid, Neujahr, Aschura) stehen gelb dabei. Sie folgen dem Umm-al-Qura-Kalender und können je nach Mondsichtung um einen Tag abweichen." : "Islamische Tage kann dieses Gerät nicht berechnen."));
+    var tr = el("h3", "", "Ramadan-Modus"); tr.style.marginTop = "22px"; b.appendChild(tr);
+    var rm = e.ramadan || { an: false, start: "" }, sr = el("div", "segment");
+    [[true, "An"], [false, "Aus"]].forEach(function (o) { var k = el("button", !!rm.an === o[0] ? "an" : "", o[1]); k.onclick = function () { aktion({ op: "einstellung", ramadan: { an: o[0], start: rm.start || "" } }); }; sr.appendChild(k); });
+    b.appendChild(zeile("Ramadan-Modus", sr));
+    var rd = inp("date", rm.start || ""), rz = el("div", "zeile"); rz.appendChild(rd);
+    if (hijriGut) { var rs = el("button", "", "Beginn aus Kalender"); rs.onclick = function () { var d = ramadanBeginnSuchen(); if (d) rd.value = d; else alert("Kein Beginn gefunden."); }; rz.appendChild(rs); }
+    var rk = el("button", "blau", "Beginn speichern"); rk.onclick = function () { aktion({ op: "einstellung", ramadan: { an: !!rm.an, start: rd.value } }); }; rz.appendChild(rk); b.appendChild(zeile("Erster Fastentag", rz));
+    b.appendChild(el("div", "klein", "Zeigt Sahur-Ende, Iftar mit Zeitanzeige und zählt die Fastentage je Person. Den ersten Tag legt deine Moschee fest, du kannst ihn hier ändern."));
+    var tp = el("h3", "", "Eltern-PIN"); tp.style.marginTop = "22px"; b.appendChild(tp);
+    b.appendChild(el("div", "klein", e.pin ? "Eine PIN ist gesetzt: Einstellungen und Belohnungen sind gesperrt. Das ist eine Kindersicherung, kein Passwortschutz." : "Mit einer PIN (4 Ziffern) sind Einstellungen und Belohnungen für Kinder gesperrt."));
+    var pn = inp("password", "", "Neue PIN, 4 Ziffern"); pn.maxLength = 4; pn.setAttribute("inputmode", "numeric"); pn.setAttribute("autocomplete", "off"); var pk = el("button", "blau", "PIN setzen");
+    pk.onclick = function () { if (!/^\d{4}$/.test(pn.value)) { alert("Bitte genau 4 Ziffern."); return; } pinBis = new Date().getTime() + 300000; aktion({ op: "einstellung", pin: pn.value }); };
+    var pz = el("div", "zeile"); pz.appendChild(pn); pz.appendChild(pk); b.appendChild(pz);
+    if (e.pin) { var pw = el("button", "", "PIN entfernen"); pw.onclick = function () { aktion({ op: "einstellung", pin: "" }); }; b.appendChild(pw); }
+  }
   function bauKalender(b) {
     var th = el("h3", "", "Kalender abgleichen (nur lesen)"); th.style.marginTop = "22px"; b.appendChild(th);
     b.appendChild(el("div", "klein", "Termine aus Google, Apple oder Outlook erscheinen im Planer. Du brauchst die geheime Kalenderadresse im iCal-Format. Google: Google Kalender am Computer → Einstellungen des Kalenders → „Geheime Adresse im iCal-Format“. Apple: Kalender-App → Kalender teilen → „Öffentlicher Kalender“ → Link kopieren. Die Adresse wird mit auf dem Server gespeichert; wer sie kennt, kann den Kalender lesen. Du kannst sie jederzeit im Kalender erneuern."));
@@ -868,6 +1116,7 @@
       b.appendChild(zeile("Symbol", sym));
       var art = el("select"); [["haken", "Abhaken"], ["zaehler", "Zählen (z. B. Pampers, Milch)"], ["schlaf", "Schlaf (Start und Ende)"]].forEach(function (a) { var o = el("option", "", a[1]); o.value = a[0]; art.appendChild(o); }); art.value = st.art; art.onchange = function () { st.art = art.value; };
       b.appendChild(zeile("Art", art));
+      var pkt = inp("number", t.punkte == null ? 1 : t.punkte); pkt.min = 0; pkt.max = 100; b.appendChild(zeile("Punkte", pkt));
       var zeit = inp("time", t.zeit); b.appendChild(zeile("Uhrzeit", zeit)); b.appendChild(el("div", "klein", "Ohne Uhrzeit steht die Aufgabe unter „Jederzeit“."));
       var tage = el("div", "chips"); function tageZeichnen() { leeren(tage); for (var i = 0; i < 7; i++) (function (n) { var k = el("button", st.tage.indexOf(n) >= 0 ? "an" : "", KURZ[n]); k.onclick = function () { var x = st.tage.indexOf(n); if (x >= 0) st.tage.splice(x, 1); else st.tage.push(n); tageZeichnen(); }; tage.appendChild(k); })(i); } tageZeichnen();
       b.appendChild(zeile("Wochentage", tage));
@@ -876,7 +1125,7 @@
       var z1 = el("div", "zeile"); var abbr = el("button", "", "Abbrechen"); abbr.onclick = zu; var ok = el("button", "blau", "Speichern");
       ok.onclick = function () {
         if (!titel.value.trim()) { alert("Bitte einen Titel eingeben."); return; }
-        var daten = { op: neu ? "aufgabe_neu" : "aufgabe_aendern", id: t.id, person: p.id, titel: titel.value, symbol: st.symbol, art: st.art, zeit: zeit.value, tage: dat.value ? [] : st.tage, datum: dat.value, ab: neu ? ymd(new Date()) : (t.ab || "") };
+        var daten = { op: neu ? "aufgabe_neu" : "aufgabe_aendern", id: t.id, person: p.id, titel: titel.value, symbol: st.symbol, art: st.art, zeit: zeit.value, tage: dat.value ? [] : st.tage, datum: dat.value, ab: neu ? ymd(new Date()) : (t.ab || ""), punkte: pkt.value };
         aktionRoh(daten, function () { zu2(); if (zuAlt) einstellungen("aufgaben", p.id); });
       };
       z1.appendChild(abbr); z1.appendChild(ok); b.appendChild(z1);
@@ -918,10 +1167,10 @@
     var cur = abschnitt || "aufgaben"; if (personId) einstPerson = personId; if (!person(einstPerson) && z.personen.length) einstPerson = z.personen[0].id;
     var zu0 = fenster(function (b, zu) {
       var h = el("h1", "", "Einstellungen"); var f = el("button", "blau", "Fertig"); f.onclick = zu; h.appendChild(f); b.appendChild(h);
-      var seg = el("div", "segment"); seg.style.marginBottom = "12px";
-      [["aufgaben", "Aufgaben"], ["personen", "Personen"], ["anzeige", "Anzeige"]].forEach(function (a) { var k = el("button", cur === a[0] ? "an" : "", a[1]); k.onclick = function () { cur = a[0]; neuBauen(); }; seg.appendChild(k); });
+      var seg = el("div", "segment eng"); seg.style.marginBottom = "12px";
+      [["aufgaben", "Aufgaben"], ["personen", "Personen"], ["belohnungen", "Belohnungen"], ["schule", "Schule"], ["anzeige", "Anzeige"]].forEach(function (a) { var k = el("button", cur === a[0] ? "an" : "", a[1]); k.onclick = function () { cur = a[0]; neuBauen(); }; seg.appendChild(k); });
       b.appendChild(seg);
-      if (cur === "aufgaben") bauAufgaben(b, zu); else if (cur === "personen") bauPersonen(b); else bauAnzeige(b);
+      if (cur === "aufgaben") bauAufgaben(b, zu); else if (cur === "personen") bauPersonen(b); else if (cur === "belohnungen") bauBelohnungen(b); else if (cur === "schule") bauSchule(b); else bauAnzeige(b);
     });
     return zu0;
   }
@@ -943,6 +1192,47 @@
     if (!l.length) b.appendChild(el("div", "klein", "Noch keine Aufgaben."));
     var n = el("button", "blau", "+ Neue Aufgabe für " + p.name); n.style.width = "100%"; n.style.marginTop = "8px"; n.onclick = function () { aufgabeFormular(p, null); }; b.appendChild(n);
   }
+  function bauBelohnungen(b) {
+    b.appendChild(el("div", "klein", "Jede Aufgabe bringt Punkte (bei der Aufgabe einstellbar, auch Gebete zählen je 1 Punkt). Hier legst du fest, was man dafür bekommt. Eingelöst wird über die gelbe Punktezahl bei jeder Person."));
+    var l = z.belohnungen || [];
+    l.forEach(function (be) {
+      var e = el("div", "eintrag"); e.appendChild(el("span", "sy", be.symbol)); var tx = el("div", "t"); tx.appendChild(el("div", "", be.titel)); tx.appendChild(el("div", "klein", be.preis + " Punkte")); e.appendChild(tx);
+      var x = el("button", "x", "✕"); x.onclick = function () { if (confirm("„" + be.titel + "“ löschen?")) aktion({ op: "belohnung_weg", id: be.id }); }; e.appendChild(x); b.appendChild(e);
+    });
+    var sy = inp("text", "🎁", "🎁"); sy.style.width = "64px"; sy.style.flex = "none"; sy.maxLength = 8; var ti = inp("text", "", "Belohnung, z. B. Eis essen"); ti.maxLength = 50; var pr = inp("number", "", "Punkte"); pr.style.width = "100px"; pr.style.flex = "none"; pr.min = 1;
+    var ok = el("button", "blau", "+ Hinzufügen"); ok.onclick = function () { if (!ti.value.trim() || !pr.value) { alert("Bitte Belohnung und Punkte eintragen."); return; } aktion({ op: "belohnung_neu", titel: ti.value, symbol: sy.value, preis: pr.value }); };
+    var r = el("div", "zeile"); r.style.marginTop = "10px"; r.appendChild(sy); r.appendChild(ti); r.appendChild(pr); r.appendChild(ok); b.appendChild(r);
+    var th = el("h3", "", "Punkte geben oder abziehen"); th.style.marginTop = "22px"; b.appendChild(th);
+    z.personen.forEach(function (p) {
+      var n = inp("number", "", "+5 oder -5"); n.style.width = "110px"; n.style.flex = "none"; var g = el("button", "", "Buchen");
+      g.onclick = function () { if (!n.value) return; aktion({ op: "punkte_geben", person: p.id, anzahl: n.value }); };
+      var r2 = el("div", "zeile"); r2.appendChild(el("span", "t", p.name + ": ⭐ " + punkteVon(p))); r2.lastChild.style.flex = "1"; r2.appendChild(n); r2.appendChild(g); b.appendChild(r2);
+    });
+  }
+  function bauSchule(b) {
+    b.appendChild(el("div", "klein", "Hausaufgaben, Prüfungen und Stundenplan erscheinen als Karte „Schule“ oben auf dem Tag."));
+    var ps = el("div", "chips"); ps.style.margin = "10px 0";
+    z.personen.forEach(function (p) { var k = el("button", p.id === einstPerson ? "an" : "", anfang(p) + " " + p.name); if (p.id === einstPerson) k.style.background = p.farbe; k.onclick = function () { einstPerson = p.id; neuBauen(); }; ps.appendChild(k); });
+    b.appendChild(ps);
+    var p = person(einstPerson); if (!p) { b.appendChild(el("div", "klein", "Zuerst unter „Personen“ jemanden anlegen.")); return; }
+    var s = schuleDaten();
+    var t1 = el("h3", "", "Hausaufgaben"); b.appendChild(t1);
+    var ha = s.ha.filter(function (x) { return x.person === p.id; });
+    ha.forEach(function (x) { var e = el("div", "eintrag"); var tx = el("div", "t"); tx.appendChild(el("div", "", (x.fertig ? "✓ " : "") + x.titel)); if (x.faellig) tx.appendChild(el("div", "klein", "bis " + x.faellig)); e.appendChild(tx); var w = el("button", "x", "✕"); w.onclick = function () { aktion({ op: "hausaufgabe_weg", id: x.id }); }; e.appendChild(w); b.appendChild(e); });
+    if (!ha.length) b.appendChild(el("div", "klein", "Keine Hausaufgaben."));
+    var hn = el("button", "blau", "+ Hausaufgabe"); hn.style.marginTop = "6px"; hn.onclick = function () { hausaufgabeFormular(p.id); }; b.appendChild(hn);
+    var t2 = el("h3", "", "Prüfungen"); t2.style.marginTop = "22px"; b.appendChild(t2);
+    s.pr.filter(function (x) { return x.person === p.id; }).sort(function (x, y) { return x.datum.localeCompare(y.datum); }).forEach(function (x) { var e = el("div", "eintrag"); var tx = el("div", "t"); tx.appendChild(el("div", "", x.fach)); tx.appendChild(el("div", "klein", x.datum)); e.appendChild(tx); var w = el("button", "x", "✕"); w.onclick = function () { aktion({ op: "pruefung_weg", id: x.id }); }; e.appendChild(w); b.appendChild(e); });
+    var pf = inp("text", "", "Fach"); pf.maxLength = 40; var pd = inp("date", ""); var pk = el("button", "blau", "+ Prüfung");
+    pk.onclick = function () { if (!pf.value.trim() || !pd.value) { alert("Bitte Fach und Datum eintragen."); return; } aktion({ op: "pruefung_neu", person: p.id, fach: pf.value, datum: pd.value }); };
+    var pr = el("div", "zeile"); pr.style.marginTop = "6px"; pr.appendChild(pf); pr.appendChild(pd); pr.appendChild(pk); b.appendChild(pr);
+    var t3 = el("h3", "", "Stundenplan (Fächer mit Komma trennen)"); t3.style.marginTop = "22px"; b.appendChild(t3);
+    var felder = [];
+    ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"].forEach(function (nm, i) { var f = inp("text", (s.plan[p.id] && s.plan[p.id][i]) || "", "z. B. Mathe, Deutsch, Sport"); f.maxLength = 160; felder.push(f); b.appendChild(zeile(nm, f)); });
+    var sp = el("button", "blau", "Stundenplan speichern");
+    sp.onclick = function () { var i = 0; (function weiter() { if (i >= 5) { if (neuBauen) neuBauen(); return; } var ix = i++; aktionRoh({ op: "plan_setzen", person: p.id, tag: ix, text: felder[ix].value }, weiter); })(); };
+    b.appendChild(sp);
+  }
   function bauPersonen(b) {
     z.personen.forEach(function (p) {
       var e = el("div", "eintrag"); e.style.flexWrap = "wrap";
@@ -950,15 +1240,16 @@
       var nm = inp("text", p.name); nm.maxLength = 30; nm.style.flex = "1";
       var fb = el("div", "chips"); var gew = p.farbe;
       function fz() { leeren(fb); FARBEN.forEach(function (c) { var k = el("button", "farbe" + (gew === c ? " an" : "")); k.style.background = c; k.onclick = function () { gew = c; fz(); }; fb.appendChild(k); }); } fz();
-      var sp = el("button", "mini blau", "Speichern"); sp.onclick = function () { aktion({ op: "person_aendern", id: p.id, name: nm.value, symbol: sy.value, farbe: gew }); };
+      var gbt = !!p.gebete, gk = el("button", "mini", ""); function gz() { gk.textContent = "🕌 Gebete abhaken: " + (gbt ? "An" : "Aus"); } gz(); gk.onclick = function () { gbt = !gbt; gz(); };
+      var sp = el("button", "mini blau", "Speichern"); sp.onclick = function () { aktion({ op: "person_aendern", id: p.id, name: nm.value, symbol: sy.value, farbe: gew, gebete: gbt }); };
       var x = el("button", "x", "✕"); x.onclick = function () { if (confirm(p.name + " mit allen Aufgaben löschen?")) aktion({ op: "person_weg", id: p.id }); };
-      e.appendChild(sy); e.appendChild(nm); e.appendChild(x); var u = el("div"); u.style.width = "100%"; u.appendChild(fb); e.appendChild(u); e.appendChild(sp); b.appendChild(e);
+      e.appendChild(sy); e.appendChild(nm); e.appendChild(x); var u = el("div"); u.style.width = "100%"; u.appendChild(fb); e.appendChild(u); e.appendChild(gk); e.appendChild(sp); b.appendChild(e);
     });
     var nn = inp("text", "", "Name der neuen Person"); nn.maxLength = 30;
     var ok = el("button", "blau", "+ Hinzufügen"); ok.onclick = function () { if (nn.value.trim()) aktion({ op: "person_neu", name: nn.value, farbe: FARBEN[z.personen.length % FARBEN.length] }); };
     var r = el("div", "zeile"); r.appendChild(nn); r.appendChild(ok); b.appendChild(r);
   }
-  var HINWEIS = "Hinweis zum Test: Deine Einträge (Namen, Aufgaben, Termine) liegen auf einem Server in Frankfurt (Supabase). Anouar Badour, der den Test betreibt, kann sie technisch einsehen und nutzt sie nur für den Test. Zum Löschen sag ihm einfach Bescheid.";
+  var HINWEIS = "Hinweis zum Test: Deine Einträge (Namen, Aufgaben, Punkte, Einkaufsliste, Hausaufgaben, Kalenderadressen) liegen auf einem Server in Frankfurt (Supabase). Anouar Badour, der den Test betreibt, kann sie technisch einsehen und nutzt sie nur für den Test. Zum Löschen sag ihm einfach Bescheid.";
   function adhanDatei(b, titel, schl, index) {
     var name = eigenName(schl), t = el("div", "klein", titel + ": " + (name ? "eigene Datei „" + name + "“" : (schl === "fadjr" ? "wie die anderen Gebete" : "mitgelieferte Aufnahme"))); t.style.marginTop = "12px"; b.appendChild(t);
     var f = inp("file", ""); f.accept = "audio/*";
@@ -1024,7 +1315,7 @@
       aktion({ op: "einstellung", gebet: r });
     };
     b.appendChild(ak);
-    bauKalender(b); bauSchoner(b);
+    bauErweitert(b); bauKalender(b); bauSchoner(b);
     var ht = el("h3", "", "Hinweis zum Test"); ht.style.marginTop = "22px"; b.appendChild(ht); b.appendChild(el("div", "klein", HINWEIS));
     var zu = el("button", "", "Standard: Fadjr 18°, Ishaa 17°"); zu.onclick = function () { aktion({ op: "einstellung", gebet: { fw: 18, iw: 17, iwMin: 0, af: 1, aus: [0, 0, 0, 0, 0] } }); }; b.appendChild(zu);
   }
@@ -1049,7 +1340,7 @@
   $("zurueck").onclick = function () { tag = plus(tag, ansicht === "woche" ? -7 : -1); zeichne(); };
   $("vor").onclick = function () { tag = plus(tag, ansicht === "woche" ? 7 : 1); zeichne(); };
   $("heute").onclick = function () { tag = ymd(new Date()); zeichne(); };
-  $("einst").onclick = function () { einstellungen("aufgaben"); };
+  $("einst").onclick = function () { pinFrage(function () { einstellungen("aufgaben"); }); };
 
   if ("serviceWorker" in navigator) { try { navigator.serviceWorker.register("sw.js"); } catch (e) {} }
   uhr(); holen(); wetterLaden(); gebetLaden();
