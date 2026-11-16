@@ -1,0 +1,12 @@
+Bilder für den Bildschirmschoner, alle von Wikimedia Commons, Lizenz CC0 (Public Domain Dedication), keine Namensnennung nötig:
+ss01.jpg: Château Chantilly 1.jpg | CC0 | https://commons.wikimedia.org/wiki/File:Ch%C3%A2teau_Chantilly_1.jpg
+ss02.jpg: Kuhmöser von Süden.jpg | CC0 | https://commons.wikimedia.org/wiki/File:Kuhm%C3%B6ser_von_S%C3%BCden.jpg
+ss03.jpg: Muemliswil Wechten 01.jpg | CC0 | https://commons.wikimedia.org/wiki/File:Muemliswil_Wechten_01.jpg
+ss04.jpg: Alcazaba Antequera.jpg | CC0 | https://commons.wikimedia.org/wiki/File:Alcazaba_Antequera.jpg
+ss05.jpg: Mosque harbour Chania 2.jpg | CC0 | https://commons.wikimedia.org/wiki/File:Mosque_harbour_Chania_2.jpg
+ss06.jpg: Former mosque harbour Chania evening sun.jpg | CC0 | https://commons.wikimedia.org/wiki/File:Former_mosque_harbour_Chania_evening_sun.jpg
+ss07.jpg: Copahue Base Lake.jpg | CC0 | https://commons.wikimedia.org/wiki/File:Copahue_Base_Lake.jpg
+ss08.jpg: Lac Delage, Quebec, Canada.jpg | CC0 | https://commons.wikimedia.org/wiki/File:Lac_Delage%2C_Quebec%2C_Canada.jpg
+ss09.jpg: International Commerce Centre on Victoria Harbour.jpg | CC0 | https://commons.wikimedia.org/wiki/File:International_Commerce_Centre_on_Victoria_Harbour.jpg
+ss10.jpg: Château Malartrie.jpg | CC0 | https://commons.wikimedia.org/wiki/File:Ch%C3%A2teau_Malartrie.jpg
+ss11.jpg: Illiki lake (part of) near Thiva Greece.jpg | CC0 | https://commons.wikimedia.org/wiki/File:Illiki_lake_(part_of)_near_Thiva_Greece.jpg

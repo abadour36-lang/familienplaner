@@ -952,37 +952,13 @@
 
   /* ---------- Bildschirmschoner: eigene Fotos (nur auf diesem Gerät) und gezeichnete Standardbilder ---------- */
   var ssEl = null, ssAn = false, ssLetzte = new Date().getTime(), ssListe = [], ssIdx = 0, ssTimer = null, ssSchicht = 0, ssZeit = null, ssDatum = null;
-  function svgUrl(s) { return "url(\"data:image/svg+xml;charset=utf-8," + encodeURIComponent(s) + "\")"; }
-  function ssSzenen() {
-    var K = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">', s = [], i, t, x, k, w, h, wx, wy;
-    function himmel(a, b, c) { return '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + a + '"/><stop offset=".65" stop-color="' + b + '"/><stop offset="1" stop-color="' + c + '"/></linearGradient></defs><rect width="1600" height="900" fill="url(#g)"/>'; }
-    s.push(K + himmel("#2b3a67", "#f08a5d", "#ffd8a8") + '<circle cx="1150" cy="540" r="95" fill="#fff4d6" opacity=".9"/><polygon points="0,900 0,560 250,330 480,540 700,380 980,620 1250,420 1600,640 1600,900" fill="#5b5f97"/><polygon points="0,900 0,700 300,520 560,700 820,560 1100,740 1380,600 1600,720 1600,900" fill="#3a3d6e"/><polygon points="0,900 0,820 400,700 800,830 1200,720 1600,830 1600,900" fill="#1f2145"/></svg>');
-    t = ""; for (i = 0; i < 9; i++) t += '<rect x="' + (800 - (140 - i * 12)) + '" y="' + (585 + i * 30) + '" width="' + (2 * (140 - i * 12)) + '" height="7" rx="3" fill="#fff1c9" opacity=".55"/>';
-    s.push(K + himmel("#1f3b73", "#ff7e5f", "#feb47b") + '<circle cx="800" cy="560" r="130" fill="#fff1c9"/><rect y="560" width="1600" height="340" fill="#1b4965"/>' + t + '</svg>');
-    t = ""; for (i = 0; i < 26; i++) { x = 40 + i * 62 + (i % 3) * 14; h = 260 + (i * 37) % 140; t += '<polygon points="' + x + "," + (900 - h) + " " + (x - 70) + ",870 " + (x + 70) + ',870" fill="' + (i % 2 ? "#2d6a4f" : "#1b4332") + '"/><rect x="' + (x - 8) + '" y="860" width="16" height="40" fill="#3e2723"/>'; }
-    s.push(K + himmel("#a8e6cf", "#dcedc1", "#ffd3b6") + '<circle cx="1250" cy="230" r="80" fill="#fff6c9"/><ellipse cx="400" cy="900" rx="700" ry="280" fill="#74c69d"/><ellipse cx="1250" cy="900" rx="800" ry="210" fill="#52b788"/>' + t + '</svg>');
-    t = ""; x = 0; k = 0;
-    while (x < 1600) {
-      w = 70 + (k * 53) % 80; h = 160 + (k * 97) % 380; t += '<rect x="' + x + '" y="' + (900 - h) + '" width="' + w + '" height="' + h + '" fill="' + (k % 2 ? "#0d1321" : "#141c33") + '"/>';
-      for (wy = 900 - h + 20; wy < 870; wy += 44) for (wx = x + 10; wx < x + w - 14; wx += 26) if ((wx * 7 + wy * 3 + k) % 5 < 2) t += '<rect x="' + wx + '" y="' + wy + '" width="12" height="18" fill="#ffd166" opacity=".8"/>';
-      x += w + 6; k++;
-    }
-    s.push(K + himmel("#0b132b", "#1c2541", "#3a506b") + '<circle cx="1300" cy="190" r="60" fill="#f1f5f9"/>' + t + '</svg>');
-    t = ""; for (i = 0; i < 24; i++) t += '<circle cx="' + ((i * 137) % 1500 + 50) + '" cy="' + ((i * 71) % 380 + 30) + '" r="' + (1.5 + i % 3) + '" fill="#fff" opacity=".8"/>';
-    s.push(K + himmel("#0f2027", "#2c5364", "#e9b872") + t + '<mask id="m"><rect width="1600" height="900" fill="#fff"/><circle cx="1280" cy="150" r="46" fill="#000"/></mask><circle cx="1250" cy="170" r="58" fill="#fdf6e3" mask="url(#m)"/>' +
-      '<g fill="#07121a"><rect y="780" width="1600" height="120"/><path d="M560 640 A240 240 0 0 1 1040 640 L1040 780 L560 780 Z"/><rect x="797" y="330" width="6" height="75"/><circle cx="800" cy="326" r="11"/>' +
-      '<path d="M330 720 A110 110 0 0 1 550 720 L550 780 L330 780 Z"/><path d="M1050 720 A110 110 0 0 1 1270 720 L1270 780 L1050 780 Z"/>' +
-      '<rect x="285" y="330" width="30" height="450"/><polygon points="285,330 315,330 300,262"/><rect x="274" y="420" width="52" height="14"/>' +
-      '<rect x="1285" y="330" width="30" height="450"/><polygon points="1285,330 1315,330 1300,262"/><rect x="1274" y="420" width="52" height="14"/></g></svg>');
-    return s;
-  }
   function ssStandardAn() { try { return localStorage.getItem("ssStandard") !== "aus"; } catch (e) { return true; } }
   function ssMinuten() { try { var v = localStorage.getItem("ssMin"); return v === null ? 10 : (+v || 0); } catch (e) { return 10; } }
   function ssFotoAnz() { try { return +localStorage.getItem("ssFotoAnz") || 0; } catch (e) { return 0; } }
   function ssBilderSammeln(fertig) {
     var l = [], n = ssFotoAnz(), i = 0;
     function weiter() {
-      if (i >= n) { if (ssStandardAn()) { var sz = ssSzenen(); for (var q = 0; q < sz.length; q++) l.push(svgUrl(sz[q])); } fertig(l); return; }
+      if (i >= n) { if (ssStandardAn()) for (var q = 1; q <= 11; q++) l.push("url(\"bilder/ss" + z2(q) + ".jpg\")"); fertig(l); return; }
       tonLesen("foto_" + i, function (d) { i++; if (d) l.push("url(\"" + d + "\")"); weiter(); });
     }
     weiter();
@@ -1045,7 +1021,7 @@
     var z1 = zeile("Startet nach", sm); z1.style.marginTop = "10px"; b.appendChild(z1);
     var sb = el("div", "segment");
     [[true, "An"], [false, "Aus"]].forEach(function (o) { var k = el("button", ssStandardAn() === o[0] ? "an" : "", o[1]); k.onclick = function () { try { localStorage.setItem("ssStandard", o[0] ? "an" : "aus"); } catch (e) {} if (neuBauen) neuBauen(); }; sb.appendChild(k); });
-    b.appendChild(zeile("Standardbilder", sb)); b.appendChild(el("div", "klein", "Gezeichnete Bilder: Berge, Meer, Wald, Stadt, Moschee."));
+    b.appendChild(zeile("Standardbilder", sb)); b.appendChild(el("div", "klein", "Mitgelieferte Fotos: Landschaften, Seen, Burgen, Moschee und Stadt am Abend."));
     var anz = ssFotoAnz(); b.appendChild(el("div", "klein", "Eigene Fotos: " + anz + " von 20. Sie werden verkleinert und bleiben nur auf diesem Gerät."));
     var f = inp("file", ""); f.accept = "image/*"; f.multiple = true;
     f.onchange = function () { if (!f.files || !f.files.length) return; ssFotosHinzu(Array.prototype.slice.call(f.files), function () { if (neuBauen) neuBauen(); }); };
