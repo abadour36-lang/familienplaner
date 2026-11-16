@@ -89,6 +89,19 @@
   .gebet div.jetztG { background: #FF9F0A; color: #000; }
   .naechstText { margin-top: 10px; font-size: 17px; font-weight: 600; }
   .terminK h2 { font-size: 18px; } .terminK .termin { font-size: 15px; padding: 5px 0; }
+  .oben > .einkaufK { flex: 1; min-width: 240px; } .einkaufK h2 { font-size: 18px; }
+  .einkaufListe { max-height: 170px; overflow-y: auto; -webkit-overflow-scrolling: touch; margin-top: 6px; }
+  .einkauf { display: flex; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--linie); font-size: 17px; cursor: pointer; }
+  .einkauf:last-child { border: 0; }
+  .einkauf .hk { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--blau); flex: none; margin-right: 10px; text-align: center; line-height: 22px; color: #fff; font-size: 16px; }
+  .einkauf.fertigE .hk { background: var(--blau); }
+  .einkauf.fertigE .t { text-decoration: line-through; opacity: .5; }
+  .einkauf .t { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  #ss { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 200; background: #000; display: none; overflow: hidden; }
+  #ss .bild { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-size: cover; background-position: center; opacity: 0; -webkit-transition: opacity 2s; transition: opacity 2s; }
+  #ss .bild.an { opacity: 1; }
+  #ss .zeit { position: absolute; left: 40px; bottom: 36px; color: #fff; text-shadow: 0 2px 14px rgba(0,0,0,.7); }
+  #ss .zeit b { display: block; font-size: 96px; line-height: 1; font-weight: 700; } #ss .zeit span { font-size: 26px; }
   .woche { display: flex; gap: 10px; overflow-x: auto; }
   .tagKarte { flex: 1; min-width: 150px; background: var(--karte); border-radius: 24px; padding: 12px; cursor: pointer; box-shadow: 0 2px 14px rgba(0,0,0,.06); }
   .tagKarte.heute { outline: 3px solid var(--blau); }
@@ -161,7 +174,7 @@
   var KURZ = ["Mo","Di","Mi","Do","Fr","Sa","So"];
   var FARBEN = ["#0A84FF","#FF375F","#30D158","#FF9F0A","#BF5AF2","#64D2FF","#FFD60A","#AC8E68"];
   var SYMBOLE = ["🛏️","🦷","👕","👟","🧥","🥣","🍎","🚿","🛁","🧺","👚","🍽️","🧹","🗑️","🛒","🍼","🧷","😴","🌙","☀️","📚","🎒","🧸","🚗","🧼","🐶","🌸","🚀","⭐","🏠","💊","🍳"];
-  var z = { rev: -1, einstellungen: { raster: 3, ort: null }, personen: [], termine: [], aufgaben: [], verlauf: {} };
+  var z = { rev: -1, einstellungen: { raster: 3, ort: null }, personen: [], termine: [], aufgaben: [], verlauf: {}, einkauf: [] };
   var wetter = null, wetterZeit = 0;
   var ansicht = "tag", tag = ymd(new Date()), letzterTag = tag, letzteHaken = "", modalOffen = false, neuBauen = null;
   try { if (localStorage.getItem("ansicht") === "woche") ansicht = "woche"; } catch (e) {}
@@ -221,7 +234,7 @@
   }
   function wetterLaden() {
     var o = z.einstellungen.ort; if (!o) return;
-    senden("GET", "/functions/v1/dienste?art=wetter&lat=" + o.lat + "&lon=" + o.lon, null, function (w) { if (w.fehler) { if (!wetter || wetter.fehler) wetter = w; setTimeout(wetterLaden, 120000); } else { w.ort = o.name; wetter = w; } wetterZeit = Date.now(); if (!modalOffen) zeichne(); }, true);
+    senden("GET", "/functions/v1/dienste?art=wetter&lat=" + o.lat + "&lon=" + o.lon, null, function (w) { if (w.fehler) { if (!wetter || wetter.fehler) wetter = w; setTimeout(wetterLaden, 120000); } else { w.ort = o.name; wetter = w; } wetterZeit = Date.now(); if (!modalOffen) zeichneRuhig(); }, true);
   }
 
   /* ---------- Netz ---------- */
@@ -236,7 +249,8 @@
     try { if (m && history.replaceState) history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
   })();
   var gesperrt = false;
-  function senden(methode, url, daten, fertig, still) {
+  function zeichneRuhig() { var a = document.activeElement; if (a && a.tagName === "INPUT" && $("inhalt").contains(a)) return; zeichne(); }
+  function senden(methode, url, daten, fertig, still, bei) {
     var x = new XMLHttpRequest();
     x.open(methode, SB + url, true); x.timeout = 15000;
     x.setRequestHeader("apikey", ANON); x.setRequestHeader("Authorization", "Bearer " + ANON);
@@ -245,7 +259,7 @@
       $("hinweis").style.display = "none";
       if (x.status === 200) { fertig(a); return; }
       if (x.status === 403 && url.indexOf("/rpc/") > 0) { sperre(); return; }
-      if (!still) alert((a && (a.fehler || a.message)) || "Fehler beim Speichern");
+      if (bei) bei(a); else if (!still) alert((a && (a.fehler || a.message)) || "Fehler beim Speichern");
     };
     x.onerror = x.ontimeout = function () { $("hinweis").style.display = "block"; };
     if (daten) { x.setRequestHeader("Content-Type", "application/json"); x.send(JSON.stringify(daten)); } else x.send();
@@ -294,6 +308,15 @@
       n.termine.push({ id: nid(), titel: txt(a.titel, 80, true), datum: dat(a.datum, true), zeit: zei(a.zeit || ""), person: a.person || "" });
     } else if (op === "termin_weg") {
       n.termine = n.termine.filter(function (t) { return t.id !== a.id; });
+    } else if (op === "einkauf_neu") {
+      n.einkauf = n.einkauf || []; if (n.einkauf.length >= 200) throw new Error("Die Einkaufsliste ist voll");
+      n.einkauf.push({ id: nid(), titel: txt(a.titel, 60, true), fertig: false });
+    } else if (op === "einkauf_haken") {
+      n.einkauf = n.einkauf || []; for (i = 0; i < n.einkauf.length; i++) if (n.einkauf[i].id === a.id) n.einkauf[i].fertig = !n.einkauf[i].fertig;
+    } else if (op === "einkauf_weg") {
+      n.einkauf = (n.einkauf || []).filter(function (e) { return e.id !== a.id; });
+    } else if (op === "einkauf_leeren") {
+      n.einkauf = (n.einkauf || []).filter(function (e) { return !e.fertig; });
     } else if (op === "aufgabe_neu") {
       if (n.aufgaben.length >= 2000) throw new Error("Zu viele Aufgaben");
       var f = aufgabeFelder(n, a); f.id = nid(); n.aufgaben.push(f);
@@ -321,6 +344,16 @@
       }
       if ("moschee" in a) { var mo = String(a.moschee || "").trim().toLowerCase(); if (mo && !/^[a-z0-9][a-z0-9-]{0,60}$/.test(mo)) throw new Error("Moschee-Kürzel ungültig"); n.einstellungen.moschee = mo; }
       if ("adhan" in a) n.einstellungen.adhan = !!a.adhan;
+      if ("kalender" in a) {
+        var kl = a.kalender instanceof Array ? a.kalender : [], k2 = [];
+        if (kl.length > 3) throw new Error("Höchstens 3 Kalender");
+        for (var kq = 0; kq < kl.length; kq++) {
+          var ku = String(kl[kq].url || "").trim().replace(/^webcal:\/\//i, "https://");
+          if (!/^https:\/\/[^\s]{8,1500}$/.test(ku)) throw new Error("Kalenderadresse ungültig");
+          k2.push({ name: txt(kl[kq].name || "Kalender", 40, true), url: ku });
+        }
+        n.einstellungen.kalender = k2;
+      }
       if ("eingerichtet" in a) n.einstellungen.eingerichtet = !!a.eingerichtet;
       if ("gebet" in a) {
         var gb = a.gebet || {}, gfw = +gb.fw, giw = +gb.iw, gim = Math.round(+gb.iwMin || 0), gaf = +gb.af, gau = [];
@@ -343,7 +376,7 @@
     });
   }
   function aktion(a, danach) { aktionRoh(a, function () { gebetPruefen(); if (danach) danach(); if (modalOffen && neuBauen) neuBauen(); else zeichne(); }); }
-  function lesen() { senden("POST", "/rest/v1/rpc/planer_lesen", { k: KEY }, function (neu) { z = neu; if (!wetter) wetterLaden(); gebetPruefen(); if (!modalOffen) zeichne(); if (!z.einstellungen.eingerichtet && !z.einstellungen.ort && !modalOffen) willkommen(); }, true); }
+  function lesen() { senden("POST", "/rest/v1/rpc/planer_lesen", { k: KEY }, function (neu) { z = neu; if (!z.einkauf) z.einkauf = []; if (!wetter) wetterLaden(); if (JSON.stringify(kalendarisch()) !== kalSig) kalLaden(); gebetPruefen(); if (!modalOffen) zeichneRuhig(); if (!z.einstellungen.eingerichtet && !z.einstellungen.ort && !modalOffen) willkommen(); }, true); }
   function holen() {
     if (gesperrt) return;
     if (!KEY) { sperre(); return; }
@@ -421,7 +454,7 @@
   function eigenName(schl) { try { return localStorage.getItem("adhanEigen_" + schl) || ""; } catch (e) { return ""; } }
   // index 0 = Fadjr, 1 bis 4 = Dohr, Assr, Maghrib, Ishaa
   function adhanSpielen(index) {
-    adhanStopp(); adhanFrei = true;
+    adhanStopp(); adhanFrei = true; ssStopp();
     var schl = index === 0 && eigenName("fadjr") ? "fadjr" : (eigenName("standard") ? "standard" : "");
     function los(quelle) {
       try {
@@ -552,17 +585,49 @@
     }
     k.appendChild(st); return k;
   }
-  function terminKarte(d) {
-    var k = el("div", "karte terminK"); var h = el("h2", "", "Termine"); var plusKnopf = el("button", "mini blau", "+ Termin"); plusKnopf.onclick = function () { terminFormular(d); }; h.appendChild(plusKnopf); k.appendChild(h);
-    var l = termineVon(d); if (!l.length) k.appendChild(el("div", "klein", "Keine Termine an diesem Tag."));
-    for (var i = 0; i < l.length && i < 3; i++) {
-      var e = el("div", "termin"); var p = el("span", "punkt"); p.style.background = farbeVon(l[i].person); e.appendChild(p);
-      var pp = person(l[i].person);
-      e.appendChild(el("span", "t", (l[i].zeit ? l[i].zeit + " Uhr  " : "") + l[i].titel + (pp ? " (" + pp.name + ")" : "")));
-      var x = el("button", "x", "✕"); (function (id) { x.onclick = function () { if (confirm("Termin löschen?")) aktion({ op: "termin_weg", id: id }); }; })(l[i].id);
-      e.appendChild(x); k.appendChild(e);
-    }
-    if (l.length > 3) k.appendChild(el("div", "klein", "+ " + (l.length - 3) + " weitere (Wochenansicht)"));
+  /* ---------- Einkaufsliste ---------- */
+  function einkaufKarte() {
+    var k = el("div", "karte einkaufK"), h = el("h2", "", "Einkauf 🛒"), l = z.einkauf || [], hatFertig = false, i;
+    for (i = 0; i < l.length; i++) if (l[i].fertig) hatFertig = true;
+    if (hatFertig) { var leer = el("button", "mini", "Erledigte löschen"); leer.style.fontSize = "14px"; leer.onclick = function () { aktion({ op: "einkauf_leeren" }); }; h.appendChild(leer); }
+    k.appendChild(h);
+    var feld = inp("text", "", "Was fehlt?"); feld.maxLength = 60; feld.setAttribute("autocomplete", "off");
+    var plusK = el("button", "blau", "+"); plusK.style.minWidth = "56px";
+    function neu() { var v = feld.value.trim(); if (!v) return; feld.value = ""; feld.blur(); aktion({ op: "einkauf_neu", titel: v }); }
+    plusK.onclick = neu; feld.onkeydown = function (e) { if (e.keyCode === 13) neu(); };
+    var zl = el("div", "zeile"); zl.style.marginBottom = "0"; zl.appendChild(feld); zl.appendChild(plusK); k.appendChild(zl);
+    var li = el("div", "einkaufListe"); if (!l.length) li.appendChild(el("div", "klein", "Die Liste ist leer."));
+    var sortiert = []; for (i = 0; i < l.length; i++) if (!l[i].fertig) sortiert.push(l[i]); for (i = 0; i < l.length; i++) if (l[i].fertig) sortiert.push(l[i]);
+    for (i = 0; i < sortiert.length; i++) (function (e) {
+      var r = el("div", "einkauf" + (e.fertig ? " fertigE" : "")); r.appendChild(el("span", "hk", e.fertig ? "✓" : "")); r.appendChild(el("span", "t", e.titel));
+      var x = el("button", "x", "✕"); x.onclick = function (ev) { ev.stopPropagation(); aktion({ op: "einkauf_weg", id: e.id }); }; r.appendChild(x);
+      r.onclick = function () { aktion({ op: "einkauf_haken", id: e.id }); }; li.appendChild(r);
+    })(sortiert[i]);
+    k.appendChild(li); return k;
+  }
+
+  /* ---------- Kalenderabgleich (Google, Apple, Outlook über die geheime Kalenderadresse, nur lesen) ---------- */
+  var kal = {}, kalFehler = false, kalSig = "[]";
+  function kalendarisch() { var l = z.einstellungen.kalender; return (l instanceof Array && l.length) ? l : []; }
+  function kalVon(d) { var l = kal[d] ? kal[d].slice() : []; l.sort(function (a, b) { return (a.z || "99").localeCompare(b.z || "99"); }); return l; }
+  function kalLaden() {
+    var l = kalendarisch(); kalSig = JSON.stringify(l); if (!l.length) { kal = {}; kalFehler = false; return; }
+    var neu = {}, offen = l.length, fehler = false;
+    function fertig() { if (--offen > 0) return; kal = neu; kalFehler = fehler; if (!modalOffen) zeichneRuhig(); }
+    l.forEach(function (q) {
+      senden("GET", "/functions/v1/dienste?art=ics&url=" + encodeURIComponent(q.url), null, function (a) {
+        if (!a || a.fehler || !a.termine) fehler = true;
+        else for (var i = 0; i < a.termine.length; i++) { var t = a.termine[i]; if (!neu[t.d]) neu[t.d] = []; neu[t.d].push({ z: t.z || "", t: t.t, q: q.name }); }
+        fertig();
+      }, true, function () { fehler = true; fertig(); });
+    });
+  }
+  function kalenderKarte(d) {
+    var k = el("div", "karte terminK"), h = el("h2", "", "Kalender"), l = kalVon(d); k.appendChild(h);
+    if (kalFehler && !l.length) k.appendChild(el("div", "klein", "Kalender gerade nicht erreichbar."));
+    else if (!l.length) k.appendChild(el("div", "klein", "Heute keine Termine."));
+    for (var i = 0; i < l.length && i < 4; i++) { var e = el("div", "termin"); e.appendChild(el("span", "t", (l[i].z ? l[i].z + " Uhr  " : "ganztags  ") + l[i].t)); k.appendChild(e); }
+    if (l.length > 4) k.appendChild(el("div", "klein", "+ " + (l.length - 4) + " weitere (Wochenansicht)"));
     return k;
   }
 
@@ -619,7 +684,7 @@
   }
 
   function zeichneTag(m) {
-    var oben = el("div", "oben"); oben.appendChild(wetterKarte(tag)); oben.appendChild(gebetKarte(tag)); oben.appendChild(terminKarte(tag)); m.appendChild(oben);
+    var oben = el("div", "oben"); oben.appendChild(wetterKarte(tag)); oben.appendChild(gebetKarte(tag)); if (kalendarisch().length) oben.appendChild(kalenderKarte(tag)); oben.appendChild(einkaufKarte()); m.appendChild(oben);
     var sp = el("div", "spalten");
     if (!z.personen.length) sp.appendChild(el("div", "klein", "Noch keine Personen. Oben rechts auf ⚙︎ tippen."));
     for (var i = 0; i < z.personen.length; i++) sp.appendChild(personSpalte(z.personen[i], tag));
@@ -635,6 +700,7 @@
       k.appendChild(el("div", "nr", String(dd.getDate())));
       var tw = tagWetter(d); k.appendChild(el("div", "w", tw ? wIcon(tw.code) + " " + tw.max + "° / " + tw.min + "°" : MONATE[dd.getMonth()]));
       var tt = termineVon(d); for (var j = 0; j < tt.length; j++) { var c = el("span", "chip", (tt[j].zeit ? tt[j].zeit + " " : "") + tt[j].titel); c.style.background = farbeVon(tt[j].person); k.appendChild(c); }
+      var kt = kalVon(d); for (var j2 = 0; j2 < kt.length; j2++) { var c2 = el("span", "chip", (kt[j2].z ? kt[j2].z + " " : "") + kt[j2].t); c2.style.background = "#64748B"; k.appendChild(c2); }
       for (var q = 0; q < z.personen.length; q++) {
         var p = z.personen[q], n = zaehle(p, d); if (!n[1]) continue;
         var pz = el("div", "pz"); var av = el("div", "av", anfang(p)); av.style.background = p.farbe; pz.appendChild(av);
@@ -671,17 +737,124 @@
   function zeile(label, feld) { var r = el("div", "zeile"); if (label) r.appendChild(el("label", "", label)); r.appendChild(feld); return r; }
   function inp(typ, wert, platz) { var i = el("input"); i.type = typ; i.value = wert || ""; if (platz) i.placeholder = platz; return i; }
 
-  function terminFormular(d) {
-    fenster(function (b, zu) {
-      var h = el("h1", "", "Neuer Termin"); b.appendChild(h);
-      var titel = inp("text", "", "Was?"); titel.maxLength = 80; var datum = inp("date", d), zeit = inp("time", "");
-      var pers = el("select"); var o0 = el("option", "", "alle"); o0.value = ""; pers.appendChild(o0);
-      for (var i = 0; i < z.personen.length; i++) { var o = el("option", "", z.personen[i].name); o.value = z.personen[i].id; pers.appendChild(o); }
-      b.appendChild(zeile("Titel", titel)); b.appendChild(zeile("Datum", datum)); b.appendChild(zeile("Uhrzeit", zeit)); b.appendChild(zeile("Für", pers));
-      var z1 = el("div", "zeile"); var abbr = el("button", "", "Abbrechen"); abbr.onclick = zu; var ok = el("button", "blau", "Speichern");
-      ok.onclick = function () { if (!titel.value.trim() || !datum.value) { alert("Bitte Titel und Datum eingeben."); return; } aktion({ op: "termin_neu", titel: titel.value, datum: datum.value, zeit: zeit.value, person: pers.value }, function () { tag = datum.value; }); zu(); };
-      z1.appendChild(abbr); z1.appendChild(ok); b.appendChild(z1);
+  /* ---------- Bildschirmschoner: eigene Fotos (nur auf diesem Gerät) und gezeichnete Standardbilder ---------- */
+  var ssEl = null, ssAn = false, ssLetzte = new Date().getTime(), ssListe = [], ssIdx = 0, ssTimer = null, ssSchicht = 0, ssZeit = null, ssDatum = null;
+  function svgUrl(s) { return "url(\"data:image/svg+xml;charset=utf-8," + encodeURIComponent(s) + "\")"; }
+  function ssSzenen() {
+    var K = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice">', s = [], i, t, x, k, w, h, wx, wy;
+    function himmel(a, b, c) { return '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + a + '"/><stop offset=".65" stop-color="' + b + '"/><stop offset="1" stop-color="' + c + '"/></linearGradient></defs><rect width="1600" height="900" fill="url(#g)"/>'; }
+    s.push(K + himmel("#2b3a67", "#f08a5d", "#ffd8a8") + '<circle cx="1150" cy="540" r="95" fill="#fff4d6" opacity=".9"/><polygon points="0,900 0,560 250,330 480,540 700,380 980,620 1250,420 1600,640 1600,900" fill="#5b5f97"/><polygon points="0,900 0,700 300,520 560,700 820,560 1100,740 1380,600 1600,720 1600,900" fill="#3a3d6e"/><polygon points="0,900 0,820 400,700 800,830 1200,720 1600,830 1600,900" fill="#1f2145"/></svg>');
+    t = ""; for (i = 0; i < 9; i++) t += '<rect x="' + (800 - (140 - i * 12)) + '" y="' + (585 + i * 30) + '" width="' + (2 * (140 - i * 12)) + '" height="7" rx="3" fill="#fff1c9" opacity=".55"/>';
+    s.push(K + himmel("#1f3b73", "#ff7e5f", "#feb47b") + '<circle cx="800" cy="560" r="130" fill="#fff1c9"/><rect y="560" width="1600" height="340" fill="#1b4965"/>' + t + '</svg>');
+    t = ""; for (i = 0; i < 26; i++) { x = 40 + i * 62 + (i % 3) * 14; h = 260 + (i * 37) % 140; t += '<polygon points="' + x + "," + (900 - h) + " " + (x - 70) + ",870 " + (x + 70) + ',870" fill="' + (i % 2 ? "#2d6a4f" : "#1b4332") + '"/><rect x="' + (x - 8) + '" y="860" width="16" height="40" fill="#3e2723"/>'; }
+    s.push(K + himmel("#a8e6cf", "#dcedc1", "#ffd3b6") + '<circle cx="1250" cy="230" r="80" fill="#fff6c9"/><ellipse cx="400" cy="900" rx="700" ry="280" fill="#74c69d"/><ellipse cx="1250" cy="900" rx="800" ry="210" fill="#52b788"/>' + t + '</svg>');
+    t = ""; x = 0; k = 0;
+    while (x < 1600) {
+      w = 70 + (k * 53) % 80; h = 160 + (k * 97) % 380; t += '<rect x="' + x + '" y="' + (900 - h) + '" width="' + w + '" height="' + h + '" fill="' + (k % 2 ? "#0d1321" : "#141c33") + '"/>';
+      for (wy = 900 - h + 20; wy < 870; wy += 44) for (wx = x + 10; wx < x + w - 14; wx += 26) if ((wx * 7 + wy * 3 + k) % 5 < 2) t += '<rect x="' + wx + '" y="' + wy + '" width="12" height="18" fill="#ffd166" opacity=".8"/>';
+      x += w + 6; k++;
+    }
+    s.push(K + himmel("#0b132b", "#1c2541", "#3a506b") + '<circle cx="1300" cy="190" r="60" fill="#f1f5f9"/>' + t + '</svg>');
+    t = ""; for (i = 0; i < 24; i++) t += '<circle cx="' + ((i * 137) % 1500 + 50) + '" cy="' + ((i * 71) % 380 + 30) + '" r="' + (1.5 + i % 3) + '" fill="#fff" opacity=".8"/>';
+    s.push(K + himmel("#0f2027", "#2c5364", "#e9b872") + t + '<mask id="m"><rect width="1600" height="900" fill="#fff"/><circle cx="1280" cy="150" r="46" fill="#000"/></mask><circle cx="1250" cy="170" r="58" fill="#fdf6e3" mask="url(#m)"/>' +
+      '<g fill="#07121a"><rect y="780" width="1600" height="120"/><path d="M560 640 A240 240 0 0 1 1040 640 L1040 780 L560 780 Z"/><rect x="797" y="330" width="6" height="75"/><circle cx="800" cy="326" r="11"/>' +
+      '<path d="M330 720 A110 110 0 0 1 550 720 L550 780 L330 780 Z"/><path d="M1050 720 A110 110 0 0 1 1270 720 L1270 780 L1050 780 Z"/>' +
+      '<rect x="285" y="330" width="30" height="450"/><polygon points="285,330 315,330 300,262"/><rect x="274" y="420" width="52" height="14"/>' +
+      '<rect x="1285" y="330" width="30" height="450"/><polygon points="1285,330 1315,330 1300,262"/><rect x="1274" y="420" width="52" height="14"/></g></svg>');
+    return s;
+  }
+  function ssStandardAn() { try { return localStorage.getItem("ssStandard") !== "aus"; } catch (e) { return true; } }
+  function ssMinuten() { try { var v = localStorage.getItem("ssMin"); return v === null ? 10 : (+v || 0); } catch (e) { return 10; } }
+  function ssFotoAnz() { try { return +localStorage.getItem("ssFotoAnz") || 0; } catch (e) { return 0; } }
+  function ssBilderSammeln(fertig) {
+    var l = [], n = ssFotoAnz(), i = 0;
+    function weiter() {
+      if (i >= n) { if (ssStandardAn()) { var sz = ssSzenen(); for (var q = 0; q < sz.length; q++) l.push(svgUrl(sz[q])); } fertig(l); return; }
+      tonLesen("foto_" + i, function (d) { i++; if (d) l.push("url(\"" + d + "\")"); weiter(); });
+    }
+    weiter();
+  }
+  function ssUhr() { var n = new Date(); if (ssZeit) { ssZeit.textContent = hhmm(n); ssDatum.textContent = langDatum(ymd(n)); } }
+  function ssZeigen() {
+    if (!ssEl || !ssListe.length) return;
+    ssSchicht = 1 - ssSchicht; var neu = ssEl.childNodes[ssSchicht], alt = ssEl.childNodes[1 - ssSchicht];
+    neu.style.backgroundImage = ssListe[ssIdx % ssListe.length]; ssIdx++; neu.className = "bild an"; alt.className = "bild";
+  }
+  function ssStart() {
+    if (ssAn) return; ssAn = true;
+    ssBilderSammeln(function (l) {
+      if (!ssAn) return;
+      if (!l.length) { ssAn = false; return; }
+      ssListe = l; ssIdx = 0;
+      if (!ssEl) {
+        ssEl = el("div"); ssEl.id = "ss"; ssEl.appendChild(el("div", "bild")); ssEl.appendChild(el("div", "bild"));
+        var zt = el("div", "zeit"); ssZeit = el("b"); ssDatum = el("span"); zt.appendChild(ssZeit); zt.appendChild(ssDatum); ssEl.appendChild(zt);
+        ssEl.onclick = function () { ssStopp(); }; document.body.appendChild(ssEl);
+      }
+      ssEl.style.display = "block"; ssUhr(); ssZeigen(); ssTimer = setInterval(ssZeigen, 12000);
     });
+  }
+  function ssStopp() {
+    if (!ssAn) return; ssAn = false; if (ssTimer) { clearInterval(ssTimer); ssTimer = null; }
+    if (ssEl) ssEl.style.display = "none"; ssLetzte = new Date().getTime();
+  }
+  function ssPruefen() {
+    if (ssAn) { ssUhr(); return; }
+    var m = ssMinuten(); if (m > 0 && !modalOffen && new Date().getTime() - ssLetzte > m * 60000) ssStart();
+  }
+  function ssRuhe() { if (!ssAn) ssLetzte = new Date().getTime(); }
+  try { document.addEventListener("touchstart", ssRuhe, true); document.addEventListener("mousedown", ssRuhe, true); document.addEventListener("keydown", ssRuhe, true); } catch (e) {}
+  function ssFotosHinzu(dateien, fertig) {
+    var n = ssFotoAnz(), i = 0;
+    function eins() {
+      if (i >= dateien.length || n >= 20) { try { localStorage.setItem("ssFotoAnz", String(n)); } catch (e) {} fertig(); return; }
+      var d = dateien[i++], url = URL.createObjectURL(d), img = new Image();
+      img.onload = function () {
+        var s = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        tonSchreiben("foto_" + n, c.toDataURL("image/jpeg", 0.8), function (ok) { if (ok) n++; eins(); });
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); eins(); };
+      img.src = url;
+    }
+    eins();
+  }
+  function ssFotosLoeschen(fertig) {
+    var n = ssFotoAnz(), i = 0;
+    function eins() { if (i >= n) { try { localStorage.setItem("ssFotoAnz", "0"); } catch (e) {} fertig(); return; } tonSchreiben("foto_" + i++, null, eins); }
+    eins();
+  }
+  function bauSchoner(b) {
+    var th = el("h3", "", "Bildschirmschoner"); th.style.marginTop = "22px"; b.appendChild(th);
+    b.appendChild(el("div", "klein", "Startet, wenn eine Weile niemand tippt. Ein Tipp beendet ihn. Gilt nur für dieses Gerät."));
+    var sm = el("div", "segment");
+    [[0, "Aus"], [5, "5 Min"], [10, "10 Min"], [20, "20 Min"], [30, "30 Min"]].forEach(function (o) { var k = el("button", ssMinuten() === o[0] ? "an" : "", o[1]); k.onclick = function () { try { localStorage.setItem("ssMin", String(o[0])); } catch (e) {} if (neuBauen) neuBauen(); }; sm.appendChild(k); });
+    var z1 = zeile("Startet nach", sm); z1.style.marginTop = "10px"; b.appendChild(z1);
+    var sb = el("div", "segment");
+    [[true, "An"], [false, "Aus"]].forEach(function (o) { var k = el("button", ssStandardAn() === o[0] ? "an" : "", o[1]); k.onclick = function () { try { localStorage.setItem("ssStandard", o[0] ? "an" : "aus"); } catch (e) {} if (neuBauen) neuBauen(); }; sb.appendChild(k); });
+    b.appendChild(zeile("Standardbilder", sb)); b.appendChild(el("div", "klein", "Gezeichnete Bilder: Berge, Meer, Wald, Stadt, Moschee."));
+    var anz = ssFotoAnz(); b.appendChild(el("div", "klein", "Eigene Fotos: " + anz + " von 20. Sie werden verkleinert und bleiben nur auf diesem Gerät."));
+    var f = inp("file", ""); f.accept = "image/*"; f.multiple = true;
+    f.onchange = function () { if (!f.files || !f.files.length) return; ssFotosHinzu(Array.prototype.slice.call(f.files), function () { if (neuBauen) neuBauen(); }); };
+    b.appendChild(f);
+    var r = el("div", "zeile"); r.style.marginTop = "8px"; var vs = el("button", "", "Vorschau"); vs.onclick = function () { ssStart(); }; r.appendChild(vs);
+    if (anz) { var lo = el("button", "", "Eigene Fotos entfernen"); lo.onclick = function () { ssFotosLoeschen(function () { if (neuBauen) neuBauen(); }); }; r.appendChild(lo); }
+    b.appendChild(r);
+  }
+  function bauKalender(b) {
+    var th = el("h3", "", "Kalender abgleichen (nur lesen)"); th.style.marginTop = "22px"; b.appendChild(th);
+    b.appendChild(el("div", "klein", "Termine aus Google, Apple oder Outlook erscheinen im Planer. Du brauchst die geheime Kalenderadresse im iCal-Format. Google: Google Kalender am Computer → Einstellungen des Kalenders → „Geheime Adresse im iCal-Format“. Apple: Kalender-App → Kalender teilen → „Öffentlicher Kalender“ → Link kopieren. Die Adresse wird mit auf dem Server gespeichert; wer sie kennt, kann den Kalender lesen. Du kannst sie jederzeit im Kalender erneuern."));
+    var l = kalendarisch();
+    l.forEach(function (q, idx) {
+      var e = el("div", "eintrag"), t = el("div", "t"); t.appendChild(el("div", "", q.name)); e.appendChild(t);
+      var x = el("button", "x", "✕"); x.onclick = function () { var neu = l.slice(); neu.splice(idx, 1); aktion({ op: "einstellung", kalender: neu }, function () { kalLaden(); }); }; e.appendChild(x); b.appendChild(e);
+    });
+    if (l.length < 3) {
+      var nm = inp("text", "", "Name, zum Beispiel Familie"); nm.maxLength = 40; var ad = inp("text", "", "Kalenderadresse einfügen"); ad.setAttribute("autocomplete", "off"); ad.spellcheck = false;
+      var ok = el("button", "blau", "+ Kalender hinzufügen");
+      ok.onclick = function () { if (!ad.value.trim()) { alert("Bitte die Kalenderadresse einfügen."); return; } aktion({ op: "einstellung", kalender: l.concat([{ name: nm.value.trim() || "Kalender", url: ad.value }]) }, function () { kalLaden(); }); };
+      b.appendChild(zeile("", nm)); b.appendChild(zeile("", ad)); b.appendChild(ok);
+    }
   }
 
   function aufgabeFormular(p, t) {
@@ -851,6 +1024,7 @@
       aktion({ op: "einstellung", gebet: r });
     };
     b.appendChild(ak);
+    bauKalender(b); bauSchoner(b);
     var ht = el("h3", "", "Hinweis zum Test"); ht.style.marginTop = "22px"; b.appendChild(ht); b.appendChild(el("div", "klein", HINWEIS));
     var zu = el("button", "", "Standard: Fadjr 18°, Ishaa 17°"); zu.onclick = function () { aktion({ op: "einstellung", gebet: { fw: 18, iw: 17, iwMin: 0, af: 1, aus: [0, 0, 0, 0, 0] } }); }; b.appendChild(zu);
   }
@@ -859,7 +1033,7 @@
   function uhr() {
     var n = new Date(); $("uhr").textContent = hhmm(n); var h = ymd(n);
     if (h !== letzterTag) { var war = tag === letzterTag; letzterTag = h; if (war) tag = h; gebetLaden(); if (!modalOffen) zeichne(); }
-    adhanPruefen();
+    adhanPruefen(); ssPruefen();
   }
   function tonZeichen() { $("ton").textContent = tonAn ? "🔔" : "🔕"; }
   $("ton").onclick = function () { tonAn = !tonAn; try { localStorage.setItem("ton", tonAn ? "an" : "aus"); } catch (e) {} tonZeichen(); if (tonAn) { audio(); melodie(PINGS[0]); } };
@@ -882,7 +1056,8 @@
   setInterval(gebetLaden, 10800000);
   setInterval(uhr, 10000);
   setInterval(holen, 4000);
-  setInterval(function () { if (!modalOffen) zeichne(); }, 60000);
+  setInterval(function () { if (!modalOffen) zeichneRuhig(); }, 60000);
+  setInterval(kalLaden, 900000);
   setInterval(wetterLaden, 1800000);
 })();
 </script>
