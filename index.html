@@ -615,7 +615,7 @@
     var neu = {}, offen = l.length, fehler = false;
     function fertig() { if (--offen > 0) return; kal = neu; kalFehler = fehler; if (!modalOffen) zeichneRuhig(); }
     l.forEach(function (q) {
-      senden("GET", "/functions/v1/dienste?art=ics&url=" + encodeURIComponent(q.url), null, function (a) {
+      senden("GET", "/functions/v1/kalender?url=" + encodeURIComponent(q.url), null, function (a) {
         if (!a || a.fehler || !a.termine) fehler = true;
         else for (var i = 0; i < a.termine.length; i++) { var t = a.termine[i]; if (!neu[t.d]) neu[t.d] = []; neu[t.d].push({ z: t.z || "", t: t.t, q: q.name }); }
         fertig();
