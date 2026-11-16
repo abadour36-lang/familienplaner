@@ -943,7 +943,7 @@
     var folie = el("div", "folie"), blatt = el("div", "blatt"); folie.appendChild(blatt); document.body.appendChild(folie);
     modalOffen = true;
     function zu() { if (folie.parentNode) folie.parentNode.removeChild(folie); modalOffen = false; neuBauen = null; zeichne(); }
-    neuBauen = function () { leeren(blatt); bauen(blatt, zu); };
+    neuBauen = function () { var st = folie.scrollTop; leeren(blatt); bauen(blatt, zu); folie.scrollTop = st; };
     neuBauen();
     return zu;
   }
