@@ -116,9 +116,16 @@
   #ss .bild.an { opacity: 1; }
   #ss .zeit { position: absolute; left: 40px; bottom: 36px; color: #fff; text-shadow: 0 2px 14px rgba(0,0,0,.7); }
   #ss .zeit b { display: block; font-size: 96px; line-height: 1; font-weight: 700; } #ss .zeit span { font-size: 26px; }
-  .woche { display: flex; gap: 10px; overflow-x: auto; }
-  .tagKarte { flex: 1; min-width: 150px; background: var(--karte); border-radius: 24px; padding: 12px; cursor: pointer; box-shadow: 0 2px 14px rgba(0,0,0,.06); }
-  .tagKarte.heute { outline: 3px solid var(--blau); }
+  .woche { display: flex; gap: 10px; overflow-x: auto; min-height: calc(100vh - 150px); }
+  .tagKarte { flex: 1; min-width: 150px; background: var(--karte); border-radius: 24px; padding: 14px; cursor: pointer; box-shadow: 0 2px 14px rgba(0,0,0,.06); }
+  .tagKarte.heute { box-shadow: inset 0 0 0 3px var(--blau), 0 2px 14px rgba(0,0,0,.06); }
+  .tagKarte .chip { font-size: 16px; padding: 4px 9px; white-space: normal; }
+  #ss .info { position: absolute; right: 32px; top: 32px; width: 380px; max-width: 42%; color: #fff; background: rgba(0,0,0,.45); border-radius: 24px; padding: 20px 24px; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  #ss .info h3 { margin: 0 0 6px; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; opacity: .75; }
+  #ss .info .wz { font-size: 40px; font-weight: 700; margin-bottom: 14px; }
+  #ss .info .tz { font-size: 21px; line-height: 1.35; margin-bottom: 4px; } #ss .info .tz i { font-style: normal; opacity: .75; margin-right: 8px; }
+  #ss .info .sek { margin-top: 14px; }
+  #ss .news { position: absolute; left: 40px; right: 40px; bottom: 150px; color: #fff; font-size: 22px; background: rgba(0,0,0,.45); border-radius: 16px; padding: 12px 20px; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
   .tagKarte .wt { font-size: 15px; font-weight: 700; color: var(--text2); text-transform: uppercase; }
   .tagKarte .nr { font-size: 34px; font-weight: 700; line-height: 1.1; }
   .tagKarte .w { font-size: 15px; color: var(--text2); margin: 2px 0 8px; }
@@ -963,7 +970,43 @@
     }
     weiter();
   }
-  function ssUhr() { var n = new Date(); if (ssZeit) { ssZeit.textContent = hhmm(n); ssDatum.textContent = langDatum(ymd(n)); } }
+  var ssInfoEl = null, ssNewsEl = null, ssNews = [], ssNewsIdx = 0, ssMin = "";
+  function ssInfoBauen() {
+    if (!ssInfoEl || !z) return;
+    var n = new Date(), heute = ymd(n), jetzt = hhmm(n), c = ssInfoEl; while (c.firstChild) c.removeChild(c.firstChild);
+    if (wetter && !wetter.fehler && wetter.aktuell) {
+      var tw = tagWetter(heute);
+      c.appendChild(el("div", "wz", wIcon(wetter.aktuell.weather_code) + " " + Math.round(wetter.aktuell.temperature_2m) + "°" + (tw ? "  " + tw.max + "° / " + tw.min + "°" : "")));
+    }
+    var l = [];
+    for (var i = 0; i < 7; i++) {
+      var d = plus(heute, i), a = termineVon(d), b = kalVon(d), k;
+      for (k = 0; k < a.length; k++) l.push({ d: d, z: a[k].zeit || "", t: a[k].titel });
+      for (k = 0; k < b.length; k++) l.push({ d: d, z: b[k].z || "", t: b[k].t });
+    }
+    l = l.filter(function (x) { return !(x.d === heute && x.z && x.z < jetzt); });
+    l.sort(function (x, y) { return (x.d + (x.z || "00:00")).localeCompare(y.d + (y.z || "00:00")); });
+    c.appendChild(el("h3", "", "Nächste Termine"));
+    if (!l.length) c.appendChild(el("div", "tz", "Keine Termine in den nächsten 7 Tagen."));
+    for (var j = 0; j < l.length && j < 5; j++) {
+      var tg = l[j].d === heute ? "Heute" : (l[j].d === plus(heute, 1) ? "Morgen" : KURZ[dow(l[j].d)] + " " + l[j].d.slice(8) + "." + l[j].d.slice(5, 7) + ".");
+      var r = el("div", "tz"); r.appendChild(el("i", "", tg + (l[j].z ? " " + l[j].z : ""))); r.appendChild(document.createTextNode(l[j].t)); c.appendChild(r);
+    }
+    var zt = gebetDaten && !gebetDaten.fehler ? gebetDaten.heute : null;
+    if (zt) {
+      var nx = -1; for (var g = 0; g < 5; g++) if (zt[g] > jetzt) { nx = g; break; }
+      var s = el("div", "sek"); s.appendChild(el("h3", "", "Gebet")); s.appendChild(el("div", "tz", nx >= 0 ? GNAMEN[nx] + " um " + zt[nx] + " Uhr" : "Fadjr morgen um " + (gebetDaten.morgen ? gebetDaten.morgen[0] : "") + " Uhr")); c.appendChild(s);
+    }
+    var mt = z.einstellungen && z.einstellungen.mitteilung; if (mt) { var s2 = el("div", "sek"); s2.appendChild(el("h3", "", "Mitteilung")); s2.appendChild(el("div", "tz", mt)); c.appendChild(s2); }
+  }
+  function ssNewsZeigen() {
+    if (!ssNewsEl) return; if (!ssNews.length) { ssNewsEl.style.display = "none"; return; }
+    ssNewsEl.style.display = "block"; ssNewsEl.textContent = "📰 " + ssNews[ssNewsIdx % ssNews.length]; ssNewsIdx++;
+  }
+  function ssNewsLaden() {
+    senden("GET", "/functions/v1/nachrichten", null, function (a) { if (a && a.meldungen && a.meldungen.length) { ssNews = a.meldungen.slice(0, 10); ssNewsZeigen(); } }, true, function () {});
+  }
+  function ssUhr() { var n = new Date(); if (ssZeit) { ssZeit.textContent = hhmm(n); ssDatum.textContent = langDatum(ymd(n)); if (ssMin !== hhmm(n)) { ssMin = hhmm(n); ssInfoBauen(); } } }
   function ssZeigen() {
     if (!ssEl || !ssListe.length) return;
     ssSchicht = 1 - ssSchicht; var neu = ssEl.childNodes[ssSchicht], alt = ssEl.childNodes[1 - ssSchicht];
@@ -978,9 +1021,10 @@
       if (!ssEl) {
         ssEl = el("div"); ssEl.id = "ss"; ssEl.appendChild(el("div", "bild")); ssEl.appendChild(el("div", "bild"));
         var zt = el("div", "zeit"); ssZeit = el("b"); ssDatum = el("span"); zt.appendChild(ssZeit); zt.appendChild(ssDatum); ssEl.appendChild(zt);
+        ssInfoEl = el("div", "info"); ssEl.appendChild(ssInfoEl); ssNewsEl = el("div", "news"); ssNewsEl.style.display = "none"; ssEl.appendChild(ssNewsEl);
         ssEl.onclick = function () { ssStopp(); }; document.body.appendChild(ssEl);
       }
-      ssEl.style.display = "block"; ssUhr(); ssZeigen(); ssTimer = setInterval(ssZeigen, 12000);
+      ssEl.style.display = "block"; ssMin = ""; ssUhr(); ssZeigen(); ssTimer = setInterval(function () { ssZeigen(); ssNewsZeigen(); }, 12000); ssNewsLaden();
     });
   }
   function ssStopp() {
