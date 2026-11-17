@@ -128,7 +128,9 @@
   #ss.nacht .bild, #ss.nacht .info, #ss.nacht .news { display: none; }
   #ss.nacht .zeit { left: 0; right: 0; top: 40%; bottom: auto; text-align: center; color: #3c3c3c; text-shadow: none; }
   #ss.nacht .zeit b { font-size: 90px; } #ss.nacht .zeit span { font-size: 22px; }
-  #ss .news { position: absolute; left: 40px; right: 40px; bottom: 150px; color: #fff; font-size: 22px; background: rgba(0,0,0,.45); border-radius: 16px; padding: 12px 20px; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  #ss .news { position: absolute; right: 32px; bottom: 32px; width: 460px; max-width: 46%; color: #fff; background: rgba(0,0,0,.45); border-radius: 24px; padding: 18px 24px; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
+  #ss .news h3 { margin: 0 0 8px; font-size: 15px; letter-spacing: .08em; text-transform: uppercase; opacity: .75; }
+  #ss .news .nz { font-size: 20px; line-height: 1.3; margin-bottom: 10px; } #ss .news .nz:last-child { margin-bottom: 0; }
   .tagKarte .wt { font-size: 15px; font-weight: 700; color: var(--text2); text-transform: uppercase; }
   .tagKarte .nr { font-size: 34px; font-weight: 700; line-height: 1.1; }
   .tagKarte .w { font-size: 15px; color: var(--text2); margin: 2px 0 8px; }
@@ -1013,10 +1015,13 @@
   }
   function ssNewsZeigen() {
     if (!ssNewsEl) return; if (!ssNews.length) { ssNewsEl.style.display = "none"; return; }
-    ssNewsEl.style.display = "block"; ssNewsEl.textContent = "📰 " + ssNews[ssNewsIdx % ssNews.length]; ssNewsIdx++;
+    ssNewsEl.style.display = "block"; while (ssNewsEl.firstChild) ssNewsEl.removeChild(ssNewsEl.firstChild);
+    ssNewsEl.appendChild(el("h3", "", "📰 Nachrichten · tagesschau.de"));
+    for (var i = 0; i < 3; i++) ssNewsEl.appendChild(el("div", "nz", ssNews[(ssNewsIdx + i) % ssNews.length]));
+    ssNewsIdx += 3;
   }
   function ssNewsLaden() {
-    senden("GET", "/functions/v1/nachrichten", null, function (a) { if (a && a.meldungen && a.meldungen.length) { ssNews = a.meldungen.slice(0, 10); ssNewsZeigen(); } }, true, function () {});
+    senden("GET", "/functions/v1/nachrichten", null, function (a) { if (a && a.meldungen && a.meldungen.length) { ssNews = a.meldungen.filter(function (t) { return !/^Livestream/i.test(t) && !/\b(ARD|HR|NDR|WDR|BR|SWR|MDR|RBB|ZDF)\b.*\bzu(m|r)?\b/.test(t) && !/^Bericht des/.test(t); }).slice(0, 9); if (ssNews.length) ssNewsZeigen(); } }, true, function () {});
   }
   function ssUhr() { var n = new Date(); if (ssZeit) { ssZeit.textContent = hhmm(n); ssDatum.textContent = langDatum(ymd(n)); if (ssMin !== hhmm(n)) { ssMin = hhmm(n); ssInfoBauen(); } } }
   function ssZeigen() {
