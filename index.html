@@ -125,6 +125,9 @@
   #ss .info .wz { font-size: 40px; font-weight: 700; margin-bottom: 14px; }
   #ss .info .tz { font-size: 21px; line-height: 1.35; margin-bottom: 4px; } #ss .info .tz i { font-style: normal; opacity: .75; margin-right: 8px; }
   #ss .info .sek { margin-top: 14px; }
+  #ss.nacht .bild, #ss.nacht .info, #ss.nacht .news { display: none; }
+  #ss.nacht .zeit { left: 0; right: 0; top: 40%; bottom: auto; text-align: center; color: #3c3c3c; text-shadow: none; }
+  #ss.nacht .zeit b { font-size: 90px; } #ss.nacht .zeit span { font-size: 22px; }
   #ss .news { position: absolute; left: 40px; right: 40px; bottom: 150px; color: #fff; font-size: 22px; background: rgba(0,0,0,.45); border-radius: 16px; padding: 12px 20px; text-shadow: 0 1px 6px rgba(0,0,0,.6); }
   .tagKarte .wt { font-size: 15px; font-weight: 700; color: var(--text2); text-transform: uppercase; }
   .tagKarte .nr { font-size: 34px; font-weight: 700; line-height: 1.1; }
@@ -529,7 +532,7 @@
   function eigenName(schl) { try { return localStorage.getItem("adhanEigen_" + schl) || ""; } catch (e) { return ""; } }
   // index 0 = Fadjr, 1 bis 4 = Dohr, Assr, Maghrib, Ishaa
   function adhanSpielen(index) {
-    adhanStopp(); adhanFrei = true; ssStopp();
+    adhanStopp(); adhanFrei = true; ssStopp(true);
     var schl = index === 0 && eigenName("fadjr") ? "fadjr" : (eigenName("standard") ? "standard" : "");
     function los(quelle) {
       try {
@@ -993,6 +996,15 @@
       var r = el("div", "tz"); r.appendChild(el("i", "", tg + (l[j].z ? " " + l[j].z : ""))); r.appendChild(document.createTextNode(l[j].t)); c.appendChild(r);
     }
     var zt = gebetDaten && !gebetDaten.fehler ? gebetDaten.heute : null;
+    var rt = ssOpt("ssRam") ? ramadanTag(heute) : 0;
+    if (rt && zt) {
+      var sr = el("div", "sek"); sr.appendChild(el("h3", "", "Ramadan · Tag " + rt));
+      sr.appendChild(el("div", "tz", jetzt < zt[0] ? "Sahur endet um " + zt[0] + " (noch " + dauer(jetzt, zt[0]) + ")" : (jetzt < zt[3] ? "Iftar um " + zt[3] + " (noch " + dauer(jetzt, zt[3]) + ")" : "Iftar war um " + zt[3] + ". Gesegnete Mahlzeit!"))); c.appendChild(sr);
+    }
+    if (ssOpt("ssPkt") && z.personen.length) {
+      var sp = el("div", "sek"); sp.appendChild(el("h3", "", "Punkte"));
+      z.personen.forEach(function (p) { sp.appendChild(el("div", "tz", p.name + "  ⭐ " + ((z.konten && z.konten[p.id]) || 0))); }); c.appendChild(sp);
+    }
     if (zt) {
       var nx = -1; for (var g = 0; g < 5; g++) if (zt[g] > jetzt) { nx = g; break; }
       var s = el("div", "sek"); s.appendChild(el("h3", "", "Gebet")); s.appendChild(el("div", "tz", nx >= 0 ? GNAMEN[nx] + " um " + zt[nx] + " Uhr" : "Fadjr morgen um " + (gebetDaten.morgen ? gebetDaten.morgen[0] : "") + " Uhr")); c.appendChild(s);
@@ -1012,27 +1024,39 @@
     ssSchicht = 1 - ssSchicht; var neu = ssEl.childNodes[ssSchicht], alt = ssEl.childNodes[1 - ssSchicht];
     neu.style.backgroundImage = ssListe[ssIdx % ssListe.length]; ssIdx++; neu.className = "bild an"; alt.className = "bild";
   }
-  function ssStart() {
-    if (ssAn) return; ssAn = true;
+  function ssOpt(n) { try { return localStorage.getItem(n) !== "aus"; } catch (e) { return true; } }
+  function nachtZeit() { var h = new Date().getHours(); return h >= 22 || h < 6; }
+  var ssNachtM = false, ssPause = 0;
+  function ssBauen() {
+    if (ssEl) return;
+    ssEl = el("div"); ssEl.id = "ss"; ssEl.appendChild(el("div", "bild")); ssEl.appendChild(el("div", "bild"));
+    var zt = el("div", "zeit"); ssZeit = el("b"); ssDatum = el("span"); zt.appendChild(ssZeit); zt.appendChild(ssDatum); ssEl.appendChild(zt);
+    ssInfoEl = el("div", "info"); ssEl.appendChild(ssInfoEl); ssNewsEl = el("div", "news"); ssNewsEl.style.display = "none"; ssEl.appendChild(ssNewsEl);
+    ssEl.onclick = function () { ssStopp(true); }; document.body.appendChild(ssEl);
+  }
+  function ssStart(nacht) {
+    if (ssAn) return; ssAn = true; ssNachtM = nacht === true;
+    if (ssNachtM) { ssBauen(); ssEl.className = "nacht"; ssEl.style.display = "block"; ssMin = ""; ssUhr(); return; }
     ssBilderSammeln(function (l) {
       if (!ssAn) return;
       if (!l.length) { ssAn = false; return; }
-      ssListe = l; ssIdx = 0;
-      if (!ssEl) {
-        ssEl = el("div"); ssEl.id = "ss"; ssEl.appendChild(el("div", "bild")); ssEl.appendChild(el("div", "bild"));
-        var zt = el("div", "zeit"); ssZeit = el("b"); ssDatum = el("span"); zt.appendChild(ssZeit); zt.appendChild(ssDatum); ssEl.appendChild(zt);
-        ssInfoEl = el("div", "info"); ssEl.appendChild(ssInfoEl); ssNewsEl = el("div", "news"); ssNewsEl.style.display = "none"; ssEl.appendChild(ssNewsEl);
-        ssEl.onclick = function () { ssStopp(); }; document.body.appendChild(ssEl);
-      }
+      ssListe = l; ssIdx = 0; ssBauen(); ssEl.className = "";
       ssEl.style.display = "block"; ssMin = ""; ssUhr(); ssZeigen(); ssTimer = setInterval(function () { ssZeigen(); ssNewsZeigen(); }, 12000); ssNewsLaden();
     });
   }
-  function ssStopp() {
+  function ssStopp(pause) {
     if (!ssAn) return; ssAn = false; if (ssTimer) { clearInterval(ssTimer); ssTimer = null; }
-    if (ssEl) ssEl.style.display = "none"; ssLetzte = new Date().getTime();
+    if (pause === true && ssNachtM) ssPause = new Date().getTime() + 600000;
+    ssNachtM = false; if (ssEl) ssEl.style.display = "none"; ssLetzte = new Date().getTime();
   }
   function ssPruefen() {
-    if (ssAn) { ssUhr(); return; }
+    var nacht = ssOpt("ssNacht") && nachtZeit();
+    if (ssAn) {
+      if (ssNachtM && !nacht) { ssStopp(); return; }
+      if (!ssNachtM && nacht) { ssStopp(); ssStart(true); return; }
+      ssUhr(); return;
+    }
+    if (nacht && !modalOffen && new Date().getTime() > ssPause) { ssStart(true); return; }
     var m = ssMinuten(); if (m > 0 && !modalOffen && new Date().getTime() - ssLetzte > m * 60000) ssStart();
   }
   function ssRuhe() { if (!ssAn) ssLetzte = new Date().getTime(); }
@@ -1065,6 +1089,10 @@
     var z1 = zeile("Startet nach", sm); z1.style.marginTop = "10px"; b.appendChild(z1);
     var sb = el("div", "segment");
     [[true, "An"], [false, "Aus"]].forEach(function (o) { var k = el("button", ssStandardAn() === o[0] ? "an" : "", o[1]); k.onclick = function () { try { localStorage.setItem("ssStandard", o[0] ? "an" : "aus"); } catch (e) {} if (neuBauen) neuBauen(); }; sb.appendChild(k); });
+    [["ssRam", "Ramadan-Zeiten zeigen", "Sahur und Iftar mit Restzeit, nur im Ramadan"], ["ssPkt", "Punktestand zeigen", "Punkte aller Personen"], ["ssNacht", "Nachtmodus", "Von 22 bis 6 Uhr dunkel mit kleiner Uhr, danach wacht der Planer von selbst auf. Ein Tipp weckt ihn für 10 Minuten."]].forEach(function (o) {
+      var sg = el("div", "segment"); [[true, "An"], [false, "Aus"]].forEach(function (v) { var k = el("button", ssOpt(o[0]) === v[0] ? "an" : "", v[1]); k.onclick = function () { try { localStorage.setItem(o[0], v[0] ? "an" : "aus"); } catch (e) {} if (neuBauen) neuBauen(); }; sg.appendChild(k); });
+      var zz = zeile(o[1], sg); zz.style.marginTop = "10px"; b.appendChild(zz); b.appendChild(el("div", "klein", o[2]));
+    });
     b.appendChild(zeile("Standardbilder", sb)); b.appendChild(el("div", "klein", "Mitgelieferte Fotos: Landschaften, Seen, Burgen, Moschee und Stadt am Abend."));
     var anz = ssFotoAnz(); b.appendChild(el("div", "klein", "Eigene Fotos: " + anz + " von 20. Sie werden verkleinert und bleiben nur auf diesem Gerät."));
     var f = inp("file", ""); f.accept = "image/*"; f.multiple = true;
