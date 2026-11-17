@@ -991,8 +991,7 @@
     }
     l = l.filter(function (x) { return !(x.d === heute && x.z && x.z < jetzt); });
     l.sort(function (x, y) { return (x.d + (x.z || "00:00")).localeCompare(y.d + (y.z || "00:00")); });
-    c.appendChild(el("h3", "", "Nächste Termine"));
-    if (!l.length) c.appendChild(el("div", "tz", "Keine Termine in den nächsten 7 Tagen."));
+    if (l.length) c.appendChild(el("h3", "", "Nächste Termine"));
     for (var j = 0; j < l.length && j < 5; j++) {
       var tg = l[j].d === heute ? "Heute" : (l[j].d === plus(heute, 1) ? "Morgen" : KURZ[dow(l[j].d)] + " " + l[j].d.slice(8) + "." + l[j].d.slice(5, 7) + ".");
       var r = el("div", "tz"); r.appendChild(el("i", "", tg + (l[j].z ? " " + l[j].z : ""))); r.appendChild(document.createTextNode(l[j].t)); c.appendChild(r);
@@ -1003,7 +1002,8 @@
       var sr = el("div", "sek"); sr.appendChild(el("h3", "", "Ramadan · Tag " + rt));
       sr.appendChild(el("div", "tz", jetzt < zt[0] ? "Sahur endet um " + zt[0] + " (noch " + dauer(jetzt, zt[0]) + ")" : (jetzt < zt[3] ? "Iftar um " + zt[3] + " (noch " + dauer(jetzt, zt[3]) + ")" : "Iftar war um " + zt[3] + ". Gesegnete Mahlzeit!"))); c.appendChild(sr);
     }
-    if (ssOpt("ssPkt") && z.personen.length) {
+    var pkt = 0; z.personen.forEach(function (p) { pkt += (z.konten && z.konten[p.id]) || 0; });
+    if (ssOpt("ssPkt") && z.personen.length && pkt > 0) {
       var sp = el("div", "sek"); sp.appendChild(el("h3", "", "Punkte"));
       z.personen.forEach(function (p) { sp.appendChild(el("div", "tz", p.name + "  ⭐ " + ((z.konten && z.konten[p.id]) || 0))); }); c.appendChild(sp);
     }
@@ -1012,9 +1012,10 @@
       var s = el("div", "sek"); s.appendChild(el("h3", "", "Gebet")); s.appendChild(el("div", "tz", nx >= 0 ? GNAMEN[nx] + " um " + zt[nx] + " Uhr" : "Fadjr morgen um " + (gebetDaten.morgen ? gebetDaten.morgen[0] : "") + " Uhr")); c.appendChild(s);
     }
     var mt = z.einstellungen && z.einstellungen.mitteilung; if (mt) { var s2 = el("div", "sek"); s2.appendChild(el("h3", "", "Mitteilung")); s2.appendChild(el("div", "tz", mt)); c.appendChild(s2); }
+    c.style.display = c.firstChild ? "block" : "none";
   }
   function ssNewsZeigen() {
-    if (!ssNewsEl) return; if (!ssNews.length) { ssNewsEl.style.display = "none"; return; }
+    if (!ssNewsEl) return; if (!ssNews.length || !ssOpt("ssNews")) { ssNewsEl.style.display = "none"; return; }
     ssNewsEl.style.display = "block"; while (ssNewsEl.firstChild) ssNewsEl.removeChild(ssNewsEl.firstChild);
     var a = ssNews[ssNewsIdx % ssNews.length]; ssNewsIdx++;
     ssNewsEl.appendChild(el("h3", "", "📰 Nachrichten · tagesschau.de"));
@@ -1022,7 +1023,7 @@
     ssNewsEl.appendChild(el("div", "nz", a.t));
   }
   function ssNewsLaden() {
-    senden("GET", "/functions/v1/nachrichten", null, function (r) {
+    senden("GET", "/functions/v1/nachrichten?v=2", null, function (r) {
       var l = r && r.artikel ? r.artikel : (r && r.meldungen ? r.meldungen.map(function (t) { return { t: t }; }) : []);
       l = l.filter(function (x) { var t = x.t || ""; return t && !/^Livestream/i.test(t) && !/\b(ARD|HR|NDR|WDR|BR|SWR|MDR|RBB|ZDF)\b.*\bzu(m|r)?\b/.test(t) && !/^Bericht des/.test(t); });
       var mit = l.filter(function (x) { return x.b; }); if (mit.length >= 3) l = mit;
@@ -1100,7 +1101,7 @@
     var z1 = zeile("Startet nach", sm); z1.style.marginTop = "10px"; b.appendChild(z1);
     var sb = el("div", "segment");
     [[true, "An"], [false, "Aus"]].forEach(function (o) { var k = el("button", ssStandardAn() === o[0] ? "an" : "", o[1]); k.onclick = function () { try { localStorage.setItem("ssStandard", o[0] ? "an" : "aus"); } catch (e) {} if (neuBauen) neuBauen(); }; sb.appendChild(k); });
-    [["ssRam", "Ramadan-Zeiten zeigen", "Sahur und Iftar mit Restzeit, nur im Ramadan"], ["ssPkt", "Punktestand zeigen", "Punkte aller Personen"], ["ssNacht", "Nachtmodus", "Von 22 bis 6 Uhr dunkel mit kleiner Uhr, danach wacht der Planer von selbst auf. Ein Tipp weckt ihn für 10 Minuten."]].forEach(function (o) {
+    [["ssNews", "Nachrichten zeigen", "Tagesschau-Meldung mit Bild, wechselt alle 12 Sekunden"], ["ssRam", "Ramadan-Zeiten zeigen", "Sahur und Iftar mit Restzeit, nur im Ramadan"], ["ssPkt", "Punktestand zeigen", "Punkte aller Personen"], ["ssNacht", "Nachtmodus", "Von 22 bis 6 Uhr dunkel mit kleiner Uhr, danach wacht der Planer von selbst auf. Ein Tipp weckt ihn für 10 Minuten."]].forEach(function (o) {
       var sg = el("div", "segment"); [[true, "An"], [false, "Aus"]].forEach(function (v) { var k = el("button", ssOpt(o[0]) === v[0] ? "an" : "", v[1]); k.onclick = function () { try { localStorage.setItem(o[0], v[0] ? "an" : "aus"); } catch (e) {} if (neuBauen) neuBauen(); }; sg.appendChild(k); });
       var zz = zeile(o[1], sg); zz.style.marginTop = "10px"; b.appendChild(zz); b.appendChild(el("div", "klein", o[2]));
     });
